@@ -133,11 +133,17 @@ const map = new Map({
       source: new OSM(),
     }),
   ],
-  target: document.getElementById('map'),
+  target: document.getElementById("map"),
   view: new View({
     center: [0, 0],
     zoom: 2,
   }),
+});
+map.on("click", function(evt) {
+  var feature = map.getFeaturesAtPixel(evt.pixel)[0];
+  if (feature) {
+    console.log(feature);
+  }
 });
 
 let literalStyle;
@@ -173,13 +179,13 @@ function refreshLayer(newStyle) {
   literalStyle = newStyle;
 }
 
-const spanValid = document.getElementById('style-valid');
-const spanInvalid = document.getElementById('style-invalid');
+const spanValid = document.getElementById("style-valid");
+const spanInvalid = document.getElementById("style-invalid");
 function setStyleStatus(errorMsg) {
-  const isError = typeof errorMsg === 'string';
-  spanValid.style.display = errorMsg === null ? 'initial' : 'none';
-  spanInvalid.firstElementChild.innerText = isError ? errorMsg : '';
-  spanInvalid.style.display = isError ? 'initial' : 'none';
+  const isError = typeof errorMsg === "string";
+  spanValid.style.display = errorMsg === null ? "initial" : "none";
+  spanInvalid.firstElementChild.innerText = isError ? errorMsg : "";
+  spanInvalid.style.display = isError ? "initial" : "none";
 }
 
 const editor = document.getElementById('style-editor');
@@ -196,8 +202,8 @@ editor.addEventListener('input', function () {
   }
 });
 
-const select = document.getElementById('style-select');
-select.value = 'circles';
+const select = document.getElementById("style-select");
+select.value = "circles";
 function onSelectChange() {
   const style = select.value;
   const newLiteralStyle = predefinedStyles[style];
@@ -210,7 +216,7 @@ function onSelectChange() {
   }
 }
 onSelectChange();
-select.addEventListener('change', onSelectChange);
+select.addEventListener("change", onSelectChange);
 
 // animate the map
 function animate() {
