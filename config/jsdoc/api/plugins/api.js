@@ -4,7 +4,7 @@
  */
 exports.defineTags = function(dictionary) {
   dictionary.defineTag('api', {
-    mustHaveValue: false,
+    mustNotHaveValue: true,
     canHaveType: false,
     canHaveName: false,
     onTagged: function(doclet, tag) {
@@ -21,14 +21,10 @@ exports.defineTags = function(dictionary) {
  * from the documentation.
  */
 
-const api = [];
+const api = {};
 const classes = {};
 const types = {};
 const modules = {};
-
-function hasApiMembers(doclet) {
-  return doclet.longname.split('#')[0] == this.longname;
-}
 
 function includeAugments(doclet) {
   // Make sure that `observables` and `fires` are taken from an already processed `class` doclet.
@@ -110,16 +106,29 @@ function includeTypes(doclet) {
   }
 }
 
+const defaultExports = {};
+const path = require('path');
+const moduleRoot = path.join(process.cwd(), 'src');
+
+// Tag default exported Identifiers because their name should be the same as the module name.
+exports.astNodeVisitor = {
+  visitNode: function(node, e, parser, currentSourceName) {
+    if (node.type === 'Identifier' && node.parent.type === 'ExportDefaultDeclaration') {
+      const modulePath = path.relative(moduleRoot, currentSourceName).replace(/\.js$/, '');
+      defaultExports['module:' + modulePath.replace(/\\/g, '/') + '~' + node.name] = true;
+    }
+  }
+};
+
 exports.handlers = {
 
   newDoclet: function(e) {
     const doclet = e.doclet;
     if (doclet.stability) {
       modules[doclet.longname.split(/[~\.]/).shift()] = true;
-      api.push(doclet);
+      api[doclet.longname.split('#')[0]] = true;
     }
     if (doclet.kind == 'class') {
-      modules[doclet.longname.split(/[~\.]/).shift()] = true;
       if (!(doclet.longname in classes)) {
         classes[doclet.longname] = doclet;
       } else if ('augments' in doclet) {
@@ -160,7 +169,7 @@ exports.handlers = {
       if (doclet.isEnum || doclet.kind == 'typedef') {
         continue;
       }
-      if (doclet.kind == 'class' && api.some(hasApiMembers, doclet)) {
+      if (doclet.kind == 'class' && doclet.longname in api) {
         // Mark undocumented classes with documented members as unexported.
         // This is used in ../template/tmpl/container.tmpl to hide the
         // constructor from the docs.
@@ -173,6 +182,15 @@ exports.handlers = {
       if (doclet._documented) {
         delete doclet.undocumented;
       }
+    }
+  },
+
+  processingComplete(e) {
+    const byLongname = e.doclets.index.longname;
+    for (const name in defaultExports) {
+      byLongname[name].forEach(function(doclet) {
+        doclet.isDefaultExport = true;
+      });
     }
   }
 
