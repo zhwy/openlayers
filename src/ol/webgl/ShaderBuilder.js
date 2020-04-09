@@ -3,7 +3,7 @@
  * @module ol/webgl/ShaderBuilder
  */
 
-import {expressionToGlsl, getStringNumberEquivalent, ValueTypes} from '../style/expressions.js';
+import { expressionToGlsl, getStringNumberEquivalent, ValueTypes } from '../style/expressions.js';
 
 /**
  * @typedef {Object} VaryingDescription
@@ -294,19 +294,19 @@ uniform mat4 u_offsetRotateMatrix;
 uniform float u_time;
 uniform float u_zoom;
 uniform float u_resolution;
-${this.uniforms.map(function(uniform) {
-    return 'uniform ' + uniform + ';';
-  }).join('\n')}
+${this.uniforms.map(function (uniform) {
+      return 'uniform ' + uniform + ';';
+    }).join('\n')}
 attribute vec2 a_position;
 attribute float a_index;
-${attributes.map(function(attribute) {
-    return 'attribute ' + attribute + ';';
-  }).join('\n')}
+${attributes.map(function (attribute) {
+      return 'attribute ' + attribute + ';';
+    }).join('\n')}
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-${varyings.map(function(varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
-  }).join('\n')}
+${varyings.map(function (varying) {
+      return 'varying ' + varying.type + ' ' + varying.name + ';';
+    }).join('\n')}
 void main(void) {
   mat4 offsetMatrix = ${offsetMatrix};
   vec2 halfSize = ${this.sizeExpression} * 0.5;
@@ -336,9 +336,9 @@ void main(void) {
   u = a_index == 0.0 || a_index == 3.0 ? 0.0 : 1.0;
   v = a_index == 2.0 || a_index == 3.0 ? 0.0 : 1.0;
   v_quadCoord = vec2(u, v);
-${varyings.map(function(varying) {
-    return '  ' + varying.name + ' = ' + varying.expression + ';';
-  }).join('\n')}
+${varyings.map(function (varying) {
+      return '  ' + varying.name + ' = ' + varying.expression + ';';
+    }).join('\n')}
 }`;
   }
 
@@ -371,14 +371,14 @@ ${varyings.map(function(varying) {
 uniform float u_time;
 uniform float u_zoom;
 uniform float u_resolution;
-${this.uniforms.map(function(uniform) {
-    return 'uniform ' + uniform + ';';
-  }).join('\n')}
+${this.uniforms.map(function (uniform) {
+      return 'uniform ' + uniform + ';';
+    }).join('\n')}
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-${varyings.map(function(varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
-  }).join('\n')}
+${varyings.map(function (varying) {
+      return 'varying ' + varying.type + ' ' + varying.name + ';';
+    }).join('\n')}
 void main(void) {
   if (${this.discardExpression}) { discard; }
   gl_FragColor = ${this.colorExpression};
@@ -454,6 +454,7 @@ export function parseLiteralStyle(style) {
       const st = '(v_quadCoord*2.-1.)';
       const a = `(atan(${st}.x,${st}.y))`;
       opacityFilter = `(1.0-smoothstep(.5-3./${visibleSize},.5,cos(floor(.5+${a}/2.094395102)*2.094395102-${a})*length(${st})))`;
+      alert(opacityFilter);
       break;
 
     default: throw new Error('Unexpected symbol type: ' + symbStyle.symbolType);
@@ -477,9 +478,9 @@ export function parseLiteralStyle(style) {
   const uniforms = {};
 
   // define one uniform per variable
-  fragContext.variables.forEach(function(varName) {
+  fragContext.variables.forEach(function (varName) {
     builder.addUniform(`float u_${varName}`);
-    uniforms[`u_${varName}`] = function() {
+    uniforms[`u_${varName}`] = function () {
       if (!style.variables || style.variables[varName] === undefined) {
         throw new Error(`The following variable is missing from the style: ${varName}`);
       }
@@ -502,7 +503,7 @@ export function parseLiteralStyle(style) {
 
   // for each feature attribute used in the fragment shader, define a varying that will be used to pass data
   // from the vertex to the fragment shader, as well as an attribute in the vertex shader (if not already present)
-  fragContext.attributes.forEach(function(attrName) {
+  fragContext.attributes.forEach(function (attrName) {
     if (vertContext.attributes.indexOf(attrName) === -1) {
       vertContext.attributes.push(attrName);
     }
@@ -510,16 +511,16 @@ export function parseLiteralStyle(style) {
   });
 
   // for each feature attribute used in the vertex shader, define an attribute in the vertex shader.
-  vertContext.attributes.forEach(function(attrName) {
+  vertContext.attributes.forEach(function (attrName) {
     builder.addAttribute(`float a_${attrName}`);
   });
 
   return {
     builder: builder,
-    attributes: vertContext.attributes.map(function(attributeName) {
+    attributes: vertContext.attributes.map(function (attributeName) {
       return {
         name: attributeName,
-        callback: function(feature, props) {
+        callback: function (feature, props) {
           let value = props[attributeName];
           if (typeof value === 'string') {
             value = getStringNumberEquivalent(vertContext, value);
