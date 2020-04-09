@@ -1,128 +1,128 @@
-import GeoJSON from '../src/ol/format/GeoJSON.js';
-import Map from '../src/ol/Map.js';
-import OSM from '../src/ol/source/OSM.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import Vector from '../src/ol/source/Vector.js';
-import View from '../src/ol/View.js';
-import WebGLPointsLayer from '../src/ol/layer/WebGLPoints.js';
+import GeoJSON from "../src/ol/format/GeoJSON.js";
+import Map from "../src/ol/Map.js";
+import OSM from "../src/ol/source/OSM.js";
+import TileLayer from "../src/ol/layer/Tile.js";
+import Vector from "../src/ol/source/Vector.js";
+import View from "../src/ol/View.js";
+import WebGLPointsLayer from "../src/ol/layer/WebGLPoints.js";
 
 const vectorSource = new Vector({
-  url: 'data/geojson/world-cities.geojson',
+  url: "data/geojson/world-cities.geojson",
   format: new GeoJSON(),
   wrapX: true,
 });
 
 const predefinedStyles = {
   icons: {
-    'icon-src': 'data/icon.png',
-    'icon-width': 18,
-    'icon-height': 28,
-    'icon-color': 'lightyellow',
-    'icon-rotate-with-view': false,
-    'icon-displacement': [0, 9],
+    "icon-src": "data/icon.png",
+    "icon-width": 18,
+    "icon-height": 28,
+    "icon-color": "lightyellow",
+    "icon-rotate-with-view": false,
+    "icon-displacement": [0, 9],
   },
   triangles: {
-    'shape-points': 3,
-    'shape-radius': 9,
-    'shape-fill-color': [
-      'interpolate',
-      ['linear'],
-      ['get', 'population'],
+    "shape-points": 3,
+    "shape-radius": 9,
+    "shape-fill-color": [
+      "interpolate",
+      ["linear"],
+      ["get", "population"],
       20000,
-      '#5aca5b',
+      "#5aca5b",
       300000,
-      '#ff6a19',
+      "#ff6a19",
     ],
-    'shape-rotate-with-view': true,
+    "shape-rotate-with-view": true,
   },
-  'triangles-latitude': {
-    'shape-points': 3,
-    'shape-radius': [
-      'interpolate',
-      ['linear'],
-      ['get', 'population'],
+  "triangles-latitude": {
+    "shape-points": 3,
+    "shape-radius": [
+      "interpolate",
+      ["linear"],
+      ["get", "population"],
       40000,
       6,
       2000000,
       12,
     ],
-    'shape-fill-color': [
-      'interpolate',
-      ['linear'],
-      ['get', 'latitude'],
+    "shape-fill-color": [
+      "interpolate",
+      ["linear"],
+      ["get", "latitude"],
       -60,
-      '#ff14c3',
+      "#ff14c3",
       -20,
-      '#ff621d',
+      "#ff621d",
       20,
-      '#ffed02',
+      "#ffed02",
       60,
-      '#00ff67',
+      "#00ff67",
     ],
-    'shape-opacity': 0.95,
+    "shape-opacity": 0.95,
   },
   circles: {
-    'circle-radius': [
-      'interpolate',
-      ['linear'],
-      ['get', 'population'],
+    "circle-radius": [
+      "interpolate",
+      ["linear"],
+      ["get", "population"],
       40000,
       4,
       2000000,
       14,
     ],
-    'circle-fill-color': ['match', ['get', 'hover'], 1, '#ff3f3f', '#006688'],
-    'circle-rotate-with-view': false,
-    'circle-displacement': [0, 0],
-    'circle-opacity': [
-      'interpolate',
-      ['linear'],
-      ['get', 'population'],
+    "circle-fill-color": ["match", ["get", "hover"], 1, "#ff3f3f", "#006688"],
+    "circle-rotate-with-view": false,
+    "circle-displacement": [0, 0],
+    "circle-opacity": [
+      "interpolate",
+      ["linear"],
+      ["get", "population"],
       40000,
       0.6,
       2000000,
       0.92,
     ],
   },
-  'circles-zoom': {
+  "circles-zoom": {
     // by using an exponential interpolation with a base of 2 we can make it so that circles will have a fixed size
     // in world coordinates between zoom level 5 and 15
-    'circle-radius': [
-      'interpolate',
-      ['exponential', 2],
-      ['zoom'],
+    "circle-radius": [
+      "interpolate",
+      ["exponential", 2],
+      ["zoom"],
       5,
       1.5,
       15,
       1.5 * Math.pow(2, 10),
     ],
-    'circle-fill-color': ['match', ['get', 'hover'], 1, '#ff3f3f', '#006688'],
-    'circle-displacement': [0, 0],
-    'circle-opacity': 0.95,
+    "circle-fill-color": ["match", ["get", "hover"], 1, "#ff3f3f", "#006688"],
+    "circle-displacement": [0, 0],
+    "circle-opacity": 0.95,
   },
-  'rotating-bars': {
-    'shape-rotation': ['*', ['time'], 0.13],
-    'shape-points': 4,
-    'shape-radius': 4,
-    'shape-radius2': 4 * Math.sqrt(2),
-    'shape-scale': [
-      'array',
+  "rotating-bars": {
+    "shape-rotation": ["*", ["time"], 0.13],
+    "shape-points": 4,
+    "shape-radius": 4,
+    "shape-radius2": 4 * Math.sqrt(2),
+    "shape-scale": [
+      "array",
       1,
-      ['interpolate', ['linear'], ['get', 'population'], 20000, 1, 300000, 7],
+      ["interpolate", ["linear"], ["get", "population"], 20000, 1, 300000, 7],
     ],
-    'shape-fill-color': [
-      'interpolate',
-      ['linear'],
-      ['get', 'population'],
+    "shape-fill-color": [
+      "interpolate",
+      ["linear"],
+      ["get", "population"],
       20000,
-      '#ffdc00',
+      "#ffdc00",
       300000,
-      '#ff5b19',
+      "#ff5b19",
     ],
-    'shape-displacement': [
-      'array',
+    "shape-displacement": [
+      "array",
       0,
-      ['interpolate', ['linear'], ['get', 'population'], 20000, 2, 300000, 14],
+      ["interpolate", ["linear"], ["get", "population"], 20000, 2, 300000, 14],
     ],
   },
 };
@@ -139,10 +139,18 @@ const map = new Map({
     zoom: 2,
   }),
 });
-map.on("click", function(evt) {
-  var feature = map.getFeaturesAtPixel(evt.pixel)[0];
+map.on("click", function (evt) {
+  const feature = map.getFeaturesAtPixel(evt.pixel)[0];
   if (feature) {
     console.log(feature);
+  }
+});
+map.on("pointermove", function (evt) {
+  const hasFeature = map.hasFeatureAtPixel(evt.pixel);
+  if (hasFeature) {
+    document.getElementById("map").style.cursor = "pointer";
+  } else {
+    document.getElementById("map").style.cursor = "default";
   }
 });
 
@@ -151,14 +159,14 @@ let pointsLayer;
 
 let selected = null;
 
-map.on('pointermove', function (ev) {
+map.on("pointermove", function (ev) {
   if (selected !== null) {
-    selected.set('hover', 0);
+    selected.set("hover", 0);
     selected = null;
   }
 
   map.forEachFeatureAtPixel(ev.pixel, function (feature) {
-    feature.set('hover', 1);
+    feature.set("hover", 1);
     selected = feature;
     return true;
   });
@@ -170,6 +178,7 @@ function refreshLayer(newStyle) {
     source: vectorSource,
     style: newStyle,
   });
+  debugger;
   map.addLayer(pointsLayer);
 
   if (previousLayer) {
@@ -188,8 +197,8 @@ function setStyleStatus(errorMsg) {
   spanInvalid.style.display = isError ? "initial" : "none";
 }
 
-const editor = document.getElementById('style-editor');
-editor.addEventListener('input', function () {
+const editor = document.getElementById("style-editor");
+editor.addEventListener("input", function () {
   const textStyle = editor.value;
   try {
     const newLiteralStyle = JSON.parse(textStyle);
@@ -203,7 +212,7 @@ editor.addEventListener('input', function () {
 });
 
 const select = document.getElementById("style-select");
-select.value = "circles";
+select.value = "my-circles";
 function onSelectChange() {
   const style = select.value;
   const newLiteralStyle = predefinedStyles[style];

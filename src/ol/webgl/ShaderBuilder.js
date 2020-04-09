@@ -2,9 +2,9 @@
  * Class for generating shaders from literal style objects
  * @module ol/webgl/ShaderBuilder
  */
-import {LINESTRING_ANGLE_COSINE_CUTOFF} from '../render/webgl/utils.js';
-import {colorToGlsl, numberToGlsl, stringToGlsl} from '../expr/gpu.js';
-import {createDefaultStyle} from '../style/flat.js';
+import { LINESTRING_ANGLE_COSINE_CUTOFF } from "../render/webgl/utils.js";
+import { colorToGlsl, numberToGlsl, stringToGlsl } from "../expr/gpu.js";
+import { createDefaultStyle } from "../style/flat.js";
 
 export const COMMON_HEADER = `#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -93,40 +93,40 @@ export class ShaderBuilder {
      * @private
      */
     this.symbolSizeExpression_ = `vec2(${numberToGlsl(
-      DEFAULT_STYLE['circle-radius'],
-    )} + ${numberToGlsl(DEFAULT_STYLE['circle-stroke-width'] * 0.5)})`;
+      DEFAULT_STYLE["circle-radius"]
+    )} + ${numberToGlsl(DEFAULT_STYLE["circle-stroke-width"] * 0.5)})`;
 
     /**
      * @type {string}
      * @private
      */
-    this.symbolRotationExpression_ = '0.0';
+    this.symbolRotationExpression_ = "0.0";
 
     /**
      * @type {string}
      * @private
      */
-    this.symbolOffsetExpression_ = 'vec2(0.0)';
+    this.symbolOffsetExpression_ = "vec2(0.0)";
 
     /**
      * @type {string}
      * @private
      */
     this.symbolColorExpression_ = colorToGlsl(
-      /** @type {string} */ (DEFAULT_STYLE['circle-fill-color']),
+      /** @type {string} */ (DEFAULT_STYLE["circle-fill-color"])
     );
 
     /**
      * @type {string}
      * @private
      */
-    this.texCoordExpression_ = 'vec4(0.0, 0.0, 1.0, 1.0)';
+    this.texCoordExpression_ = "vec4(0.0, 0.0, 1.0, 1.0)";
 
     /**
      * @type {string}
      * @private
      */
-    this.discardExpression_ = 'false';
+    this.discardExpression_ = "false";
 
     /**
      * @type {boolean}
@@ -144,40 +144,40 @@ export class ShaderBuilder {
      * @type {string}
      * @private
      */
-    this.strokeWidthExpression_ = numberToGlsl(DEFAULT_STYLE['stroke-width']);
+    this.strokeWidthExpression_ = numberToGlsl(DEFAULT_STYLE["stroke-width"]);
 
     /**
      * @type {string}
      * @private
      */
     this.strokeColorExpression_ = colorToGlsl(
-      /** @type {string} */ (DEFAULT_STYLE['stroke-color']),
+      /** @type {string} */ (DEFAULT_STYLE["stroke-color"])
     );
 
     /**
      * @private
      */
-    this.strokeOffsetExpression_ = '0.';
+    this.strokeOffsetExpression_ = "0.";
 
     /**
      * @private
      */
-    this.strokeCapExpression_ = stringToGlsl('round');
+    this.strokeCapExpression_ = stringToGlsl("round");
 
     /**
      * @private
      */
-    this.strokeJoinExpression_ = stringToGlsl('round');
+    this.strokeJoinExpression_ = stringToGlsl("round");
 
     /**
      * @private
      */
-    this.strokeMiterLimitExpression_ = '10.';
+    this.strokeMiterLimitExpression_ = "10.";
 
     /**
      * @private
      */
-    this.strokeDistanceFieldExpression_ = '-1000.';
+    this.strokeDistanceFieldExpression_ = "-1000.";
 
     /**
      * @type {boolean}
@@ -190,7 +190,7 @@ export class ShaderBuilder {
      * @private
      */
     this.fillColorExpression_ = colorToGlsl(
-      /** @type {string} */ (DEFAULT_STYLE['fill-color']),
+      /** @type {string} */ (DEFAULT_STYLE["fill-color"])
     );
 
     /**
@@ -475,17 +475,17 @@ export class ShaderBuilder {
     return `${COMMON_HEADER}
 ${this.uniforms_
   .map(function (uniform) {
-    return 'uniform ' + uniform + ';';
+    return "uniform " + uniform + ";";
   })
-  .join('\n')}
+  .join("\n")}
 attribute vec2 a_position;
 attribute float a_index;
 attribute vec4 a_prop_hitColor;
 ${this.attributes_
   .map(function (attribute) {
-    return 'attribute ' + attribute + ';';
+    return "attribute " + attribute + ";";
   })
-  .join('\n')}
+  .join("\n")}
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
 varying vec4 v_prop_hitColor;
@@ -494,10 +494,10 @@ varying float v_angle;
 varying vec2 v_quadSizePx;
 ${this.varyings_
   .map(function (varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
+    return "varying " + varying.type + " " + varying.name + ";";
   })
-  .join('\n')}
-${this.vertexShaderFunctions_.join('\n')}
+  .join("\n")}
+${this.vertexShaderFunctions_.join("\n")}
 vec2 pxToScreen(vec2 coordPx) {
   vec2 scaled = coordPx / u_viewportSizePx / 0.5;
   return scaled;
@@ -522,7 +522,7 @@ void main(void) {
     offsetPx += halfSizePx * vec2(-1., 1.);
   }
   float angle = ${this.symbolRotationExpression_};
-  ${this.symbolRotateWithView_ ? 'angle += u_rotation;' : ''}
+  ${this.symbolRotateWithView_ ? "angle += u_rotation;" : ""}
   float c = cos(-angle);
   float s = sin(-angle);
   offsetPx = vec2(c * offsetPx.x - s * offsetPx.y, s * offsetPx.x + c * offsetPx.y);
@@ -540,9 +540,9 @@ void main(void) {
   v_centerPx = screenToPx(center.xy) + centerOffsetPx;
 ${this.varyings_
   .map(function (varying) {
-    return '  ' + varying.name + ' = ' + varying.expression + ';';
+    return "  " + varying.name + " = " + varying.expression + ";";
   })
-  .join('\n')}
+  .join("\n")}
 }`;
   }
 
@@ -558,9 +558,9 @@ ${this.varyings_
     return `${COMMON_HEADER}
 ${this.uniforms_
   .map(function (uniform) {
-    return 'uniform ' + uniform + ';';
+    return "uniform " + uniform + ";";
   })
-  .join('\n')}
+  .join("\n")}
 varying vec2 v_texCoord;
 varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
@@ -568,10 +568,10 @@ varying float v_angle;
 varying vec2 v_quadSizePx;
 ${this.varyings_
   .map(function (varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
+    return "varying " + varying.type + " " + varying.name + ";";
   })
-  .join('\n')}
-${this.fragmentShaderFunctions_.join('\n')}
+  .join("\n")}
+${this.fragmentShaderFunctions_.join("\n")}
 
 void main(void) {
   if (${this.discardExpression_}) { discard; }
@@ -599,9 +599,9 @@ void main(void) {
     return `${COMMON_HEADER}
 ${this.uniforms_
   .map(function (uniform) {
-    return 'uniform ' + uniform + ';';
+    return "uniform " + uniform + ";";
   })
-  .join('\n')}
+  .join("\n")}
 attribute vec2 a_position;
 attribute float a_index;
 attribute vec2 a_segmentStart;
@@ -612,9 +612,9 @@ attribute vec2 a_joinAngles;
 attribute vec4 a_prop_hitColor;
 ${this.attributes_
   .map(function (attribute) {
-    return 'attribute ' + attribute + ';';
+    return "attribute " + attribute + ";";
   })
-  .join('\n')}
+  .join("\n")}
 varying vec2 v_segmentStart;
 varying vec2 v_segmentEnd;
 varying float v_angleStart;
@@ -624,10 +624,10 @@ varying vec4 v_prop_hitColor;
 varying float v_distanceOffsetPx;
 ${this.varyings_
   .map(function (varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
+    return "varying " + varying.type + " " + varying.name + ";";
   })
-  .join('\n')}
-${this.vertexShaderFunctions_.join('\n')}
+  .join("\n")}
+${this.vertexShaderFunctions_.join("\n")}
 vec2 worldToPx(vec2 worldPos) {
   vec4 screenPos = u_projectionMatrix * vec4(worldPos, 0.0, 1.0);
   return (0.5 * screenPos.xy + 0.5) * u_viewportSizePx;
@@ -700,9 +700,9 @@ void main(void) {
   v_distanceOffsetPx = a_distance / u_resolution - (lineOffsetPx * angleTangentSum);
 ${this.varyings_
   .map(function (varying) {
-    return '  ' + varying.name + ' = ' + varying.expression + ';';
+    return "  " + varying.name + " = " + varying.expression + ";";
   })
-  .join('\n')}
+  .join("\n")}
 }`;
   }
 
@@ -719,9 +719,9 @@ ${this.varyings_
     return `${COMMON_HEADER}
 ${this.uniforms_
   .map(function (uniform) {
-    return 'uniform ' + uniform + ';';
+    return "uniform " + uniform + ";";
   })
-  .join('\n')}
+  .join("\n")}
 varying vec2 v_segmentStart;
 varying vec2 v_segmentEnd;
 varying float v_angleStart;
@@ -731,10 +731,10 @@ varying vec4 v_prop_hitColor;
 varying float v_distanceOffsetPx;
 ${this.varyings_
   .map(function (varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
+    return "varying " + varying.type + " " + varying.name + ";";
   })
-  .join('\n')}
-${this.fragmentShaderFunctions_.join('\n')}
+  .join("\n")}
+${this.fragmentShaderFunctions_.join("\n")}
 
 vec2 pxToWorld(vec2 pxPos) {
   vec2 screenPos = 2.0 * pxPos / u_viewportSizePx - 1.0;
@@ -795,18 +795,18 @@ float miterJoinDistanceField(vec2 point, vec2 start, vec2 end, float width, floa
 }
 
 float capDistanceField(vec2 point, vec2 start, vec2 end, float width, float capType) {
-   if (capType == ${stringToGlsl('butt')}) {
+   if (capType == ${stringToGlsl("butt")}) {
     return buttCapDistanceField(point, start, end);
-  } else if (capType == ${stringToGlsl('square')}) {
+  } else if (capType == ${stringToGlsl("square")}) {
     return squareCapDistanceField(point, start, end, width);
   }
   return roundCapDistanceField(point, start, end, width);
 }
 
 float joinDistanceField(vec2 point, vec2 start, vec2 end, float width, float joinAngle, float joinType) {
-  if (joinType == ${stringToGlsl('bevel')}) {
+  if (joinType == ${stringToGlsl("bevel")}) {
     return bevelJoinField(point, start, end, width, joinAngle);
-  } else if (joinType == ${stringToGlsl('miter')}) {
+  } else if (joinType == ${stringToGlsl("miter")}) {
     return miterJoinDistanceField(point, start, end, width, joinAngle);
   }
   return roundJoinDistanceField(point, start, end, width);
@@ -874,31 +874,31 @@ void main(void) {
     return `${COMMON_HEADER}
 ${this.uniforms_
   .map(function (uniform) {
-    return 'uniform ' + uniform + ';';
+    return "uniform " + uniform + ";";
   })
-  .join('\n')}
+  .join("\n")}
 attribute vec2 a_position;
 attribute vec4 a_prop_hitColor;
 ${this.attributes_
   .map(function (attribute) {
-    return 'attribute ' + attribute + ';';
+    return "attribute " + attribute + ";";
   })
-  .join('\n')}
+  .join("\n")}
 varying vec4 v_prop_hitColor;
 ${this.varyings_
   .map(function (varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
+    return "varying " + varying.type + " " + varying.name + ";";
   })
-  .join('\n')}
-${this.vertexShaderFunctions_.join('\n')}
+  .join("\n")}
+${this.vertexShaderFunctions_.join("\n")}
 void main(void) {
   gl_Position = u_projectionMatrix * vec4(a_position, u_depth, 1.0);
   v_prop_hitColor = a_prop_hitColor;
 ${this.varyings_
   .map(function (varying) {
-    return '  ' + varying.name + ' = ' + varying.expression + ';';
+    return "  " + varying.name + " = " + varying.expression + ";";
   })
-  .join('\n')}
+  .join("\n")}
 }`;
   }
 
@@ -914,16 +914,16 @@ ${this.varyings_
     return `${COMMON_HEADER}
 ${this.uniforms_
   .map(function (uniform) {
-    return 'uniform ' + uniform + ';';
+    return "uniform " + uniform + ";";
   })
-  .join('\n')}
+  .join("\n")}
 varying vec4 v_prop_hitColor;
 ${this.varyings_
   .map(function (varying) {
-    return 'varying ' + varying.type + ' ' + varying.name + ';';
+    return "varying " + varying.type + " " + varying.name + ";";
   })
-  .join('\n')}
-${this.fragmentShaderFunctions_.join('\n')}
+  .join("\n")}
+${this.fragmentShaderFunctions_.join("\n")}
 vec2 pxToWorld(vec2 pxPos) {
   vec2 screenPos = 2.0 * pxPos / u_viewportSizePx - 1.0;
   return (u_screenToWorldMatrix * vec4(screenPos, 0.0, 1.0)).xy;
