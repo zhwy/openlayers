@@ -5,14 +5,14 @@
 import TileState from '../TileState.js';
 import VectorRenderTile from '../VectorRenderTile.js';
 import Tile from '../VectorTile.js';
-import {toSize} from '../size.js';
+import { toSize } from '../size.js';
 import UrlTile from './UrlTile.js';
-import {getKeyZXY, fromKey} from '../tilecoord.js';
-import {createXYZ, extentFromProjection, createForProjection} from '../tilegrid.js';
-import {buffer as bufferExtent, getIntersection, intersects} from '../extent.js';
+import { getKeyZXY, fromKey } from '../tilecoord.js';
+import { createXYZ, extentFromProjection, createForProjection } from '../tilegrid.js';
+import { buffer as bufferExtent, getIntersection, intersects } from '../extent.js';
 import EventType from '../events/EventType.js';
-import {loadFeaturesXhr} from '../featureloader.js';
-import {equals} from '../array.js';
+import { loadFeaturesXhr } from '../featureloader.js';
+import { equals } from '../array.js';
 import TileCache from '../TileCache.js';
 
 /**
@@ -186,7 +186,7 @@ class VectorTile extends UrlTile {
     }
     const z = fromKey(tileCache.peekFirstKey())[0];
     const tileGrid = this.tileGrid;
-    tileCache.forEach(function(tile) {
+    tileCache.forEach(function (tile) {
       if (tile.tileCoord[0] !== z || tile.getState() !== TileState.LOADED) {
         return;
       }
@@ -257,7 +257,6 @@ class VectorTile extends UrlTile {
     }
     const sourceZ = sourceTileGrid.getZForResolution(resolution, 1);
     const minZoom = sourceTileGrid.getMinZoom();
-
     const previousSourceTiles = tile.sourceTiles;
     let sourceTiles, covered, loadedZ;
     if (previousSourceTiles && previousSourceTiles.length > 0 && previousSourceTiles[0].tileCoord[0] === sourceZ) {
@@ -270,7 +269,7 @@ class VectorTile extends UrlTile {
       do {
         --loadedZ;
         covered = true;
-        sourceTileGrid.forEachTileCoord(extent, loadedZ, function(sourceTileCoord) {
+        sourceTileGrid.forEachTileCoord(extent, loadedZ, function (sourceTileCoord) {
           const tileUrl = this.tileUrlFunction(sourceTileCoord, pixelRatio, projection);
           let sourceTile;
           if (tileUrl !== undefined) {
@@ -373,7 +372,7 @@ class VectorTile extends UrlTile {
       // make extent 1 pixel smaller so we don't load tiles for < 0.5 pixel render space
       const extent = tileGrid.getTileCoordExtent(urlTileCoord);
       bufferExtent(extent, -resolution, extent);
-      sourceTileGrid.forEachTileCoord(extent, sourceZ, function(sourceTileCoord) {
+      sourceTileGrid.forEachTileCoord(extent, sourceZ, function (sourceTileCoord) {
         empty = empty && !this.tileUrlFunction(sourceTileCoord, pixelRatio, projection);
       }.bind(this));
     }
