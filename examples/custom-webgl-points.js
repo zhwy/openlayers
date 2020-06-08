@@ -22,12 +22,12 @@ class CustomLayer extends VectorLayer {
                 {
                     name: 'type',
                     callback: feature => {
-                        return feature.get('population') > 1000000 ? 0 : 1;
+                        return feature.get('population') < 5000000 ? 0 : 1;
                     }
                 }
             ],
             uniforms: {
-                u_color: [0.0, 0.5, 1.0, 0.8]
+                u_color: [0.0, 0.5, 1.0, 1.]
             },
             vertexShader: `
                 precision mediump float;
@@ -103,17 +103,25 @@ class CustomLayer extends VectorLayer {
                     if(v_type == 0.0)
                     {
                         // 圆形
-                        gl_FragColor = vec4(v_color.rgb, v_color.a * 1.0 * (1.0-smoothstep(1.-4./v_size.x,1.,dot(v_quadCoord-.5,v_quadCoord-.5)*4.)));
+                        vec4 tmp = vec4(v_color.rgb, 1. * (1. - smoothstep(1. - 4./v_size.x, 1., dot(v_quadCoord-.5,v_quadCoord-.5)*4. + 2./v_size.x)));
+                        gl_FragColor = vec4(1., 1., 1., v_color.a * 1.0 * (1.0-smoothstep(1.-4./v_size.x,1.,dot(v_quadCoord-.5,v_quadCoord-.5)*4.)));                        
+
+                        gl_FragColor.a -= tmp.a; //减出一个环
+                        gl_FragColor.rgb *= gl_FragColor.a;
+
+                        tmp.rgb *= tmp.a;
+                        gl_FragColor += tmp; //加上环 
+                        
+
                     }
                     else
                     {
                         // 三角形
                         float tmp = 2.094395102;
-                        // tmp = 3.;
-                        gl_FragColor = vec4(v_color.rgb, v_color.a * 1.0 * (1.0-smoothstep(.5-3./v_size.x,.5,cos(floor(.5+(atan((v_quadCoord*2.-1.).x,(v_quadCoord*2.-1.).y))/tmp)*tmp-(atan((v_quadCoord*2.-1.).x,(v_quadCoord*2.-1.).y)))*length((v_quadCoord*2.-1.)))));
-                    }
-
-                    gl_FragColor.rgb *= gl_FragColor.a;
+                        vec2 trans = v_quadCoord * 2. -1.;
+                        gl_FragColor = vec4(v_color.rgb, v_color.a * 1.0 * (1.0 - smoothstep(0.5 - 3./v_size.x, .5, cos(floor(.5 + atan(trans.x,trans.y) / tmp) *  tmp - atan(trans.x,trans.y)) * length(trans))));
+                        gl_FragColor.rgb *= gl_FragColor.a;
+                    }                    
                 }
             `,
             hitVertexShader: `
