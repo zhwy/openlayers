@@ -9,9 +9,16 @@ import XYZ from 'ol/source/XYZ';
 import TileDebug from "../src/ol/source/TileDebug.js";
 import * as olProj from 'ol/proj';
 import { defaultResolutions } from 'ol-mapbox-style/dist/util.js';
+import FullScreen from '../src/ol/control/FullScreen.js';
+import apply from 'ol-mapbox-style';
 
 // original example
-// apply('map', 'https://api.maptiler.com/maps/topo/style.json?key=get_your_own_D6rA4zTHduk6KOKTXzGB');
+// apply(
+//     'map',
+//     'https://api.maptiler.com/maps/topo/style.json?key=get_your_own_D6rA4zTHduk6KOKTXzGB'
+// ).then(function (map) {
+//     map.addControl(new FullScreen());
+// });
 
 const maxResolution = 360 / 512;
 defaultResolutions.length = 14;
@@ -72,3 +79,6 @@ olms(map, url).then(map => {
 })
 //apply('map', 'https://api.mapbox.com/v4/mapbox.mapbox-streets-v7,mapbox.mapbox-terrain-v2.json?secure&access_token=pk.eyJ1IjoibW14cWFubnkiLCJhIjoiY2pjZmlzNXp3MWJqaDMzdDUxdXMweG15eCJ9.Onu8fH96QnXhOJmqh0bZZA')
 // apply('map', 'https://api.mapbox.cn/v4/mapbox.china-streets-v1,mapbox.mapbox-streets-v7.json?secure&access_token=pk.eyJ1IjoibmF0aGFuODkxMSIsImEiOiJjamh2aWwyZGMwemphM2pwYXdrNnM5YzllIn0.cMSTMVcdiefqYkZ9X6IClA')
+
+
+

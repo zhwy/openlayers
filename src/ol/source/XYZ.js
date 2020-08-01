@@ -9,11 +9,12 @@ import {createXYZ, extentFromProjection} from '../tilegrid.js';
  * @typedef {Object} Options
  * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
  * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
- * @property {number} [cacheSize] Tile cache size. The default depends on the screen size. Will be ignored if too small.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
  * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
  * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
  * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
- * @property {boolean} [opaque=true] Whether the layer is opaque.
+ * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Projection.
  * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
  * Higher values can increase reprojection performance, but decrease precision.
@@ -49,7 +50,6 @@ import {createXYZ, extentFromProjection} from '../tilegrid.js';
  * will be used. If -1, the nearest higher resolution will be used.
  */
 
-
 /**
  * @classdesc
  * Layer source for tile data with URLs in a set XYZ format that are
@@ -74,22 +74,25 @@ class XYZ extends TileImage {
    */
   constructor(opt_options) {
     const options = opt_options || {};
-    const projection = options.projection !== undefined ?
-      options.projection : 'EPSG:3857';
+    const projection =
+      options.projection !== undefined ? options.projection : 'EPSG:3857';
 
-    const tileGrid = options.tileGrid !== undefined ? options.tileGrid :
-      createXYZ({
-        extent: extentFromProjection(projection),
-        maxResolution: options.maxResolution,
-        maxZoom: options.maxZoom,
-        minZoom: options.minZoom,
-        tileSize: options.tileSize
-      });
+    const tileGrid =
+      options.tileGrid !== undefined
+        ? options.tileGrid
+        : createXYZ({
+            extent: extentFromProjection(projection),
+            maxResolution: options.maxResolution,
+            maxZoom: options.maxZoom,
+            minZoom: options.minZoom,
+            tileSize: options.tileSize,
+          });
 
     super({
       attributions: options.attributions,
       cacheSize: options.cacheSize,
       crossOrigin: options.crossOrigin,
+      imageSmoothing: options.imageSmoothing,
       opaque: options.opaque,
       projection: projection,
       reprojectionErrorThreshold: options.reprojectionErrorThreshold,
@@ -102,11 +105,9 @@ class XYZ extends TileImage {
       wrapX: options.wrapX !== undefined ? options.wrapX : true,
       transition: options.transition,
       attributionsCollapsible: options.attributionsCollapsible,
-      zDirection: options.zDirection
+      zDirection: options.zDirection,
     });
-
   }
-
 }
 
 export default XYZ;

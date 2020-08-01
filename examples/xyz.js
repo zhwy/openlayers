@@ -1,8 +1,7 @@
 import Map from '../src/ol/Map.js';
-import View from '../src/ol/View.js';
 import TileLayer from '../src/ol/layer/Tile.js';
+import View from '../src/ol/View.js';
 import XYZ from '../src/ol/source/XYZ.js';
-
 
 const map = new Map({
   target: 'map',
@@ -17,6 +16,6 @@ const map = new Map({
   ],
   view: new View({
     center: [-472202, 7530279],
-    zoom: 12
-  })
+    zoom: 12,
+  }),
 });

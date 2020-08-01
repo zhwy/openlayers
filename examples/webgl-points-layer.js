@@ -1,14 +1,14 @@
-import Map from '../src/ol/Map.js';
-import View from '../src/ol/View.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import WebGLPointsLayer from '../src/ol/layer/WebGLPoints.js';
 import GeoJSON from '../src/ol/format/GeoJSON.js';
-import Vector from '../src/ol/source/Vector.js';
+import Map from '../src/ol/Map.js';
 import OSM from '../src/ol/source/OSM.js';
+import TileLayer from '../src/ol/layer/Tile.js';
+import Vector from '../src/ol/source/Vector.js';
+import View from '../src/ol/View.js';
+import WebGLPointsLayer from '../src/ol/layer/WebGLPoints.js';
 
 const vectorSource = new Vector({
   url: 'data/geojson/world-cities.geojson',
-  format: new GeoJSON()
+  format: new GeoJSON(),
 });
 
 const predefinedStyles = {
@@ -19,8 +19,8 @@ const predefinedStyles = {
       size: [18, 28],
       color: 'lightyellow',
       rotateWithView: false,
-      offset: [0, 9]
-    }
+      offset: [0, 9],
+    },
   },
   triangles: {
     symbol: {
@@ -33,10 +33,10 @@ const predefinedStyles = {
         20000,
         '#5aca5b',
         300000,
-        '#ff6a19'
+        '#ff6a19',
       ],
-      rotateWithView: true
-    }
+      rotateWithView: true,
+    },
   },
   'triangles-latitude': {
     symbol: {
@@ -48,7 +48,7 @@ const predefinedStyles = {
         40000,
         12,
         2000000,
-        24
+        24,
       ],
       color: [
         'interpolate',
@@ -61,11 +61,11 @@ const predefinedStyles = {
         20,
         '#ffed02',
         60,
-        '#00ff67'
+        '#00ff67',
       ],
       offset: [0, 0],
-      opacity: 0.95
-    }
+      opacity: 0.95,
+    },
   },
   circles: {
     symbol: {
@@ -77,7 +77,7 @@ const predefinedStyles = {
         40000,
         8,
         2000000,
-        28
+        28,
       ],
       color: '#006688',
       rotateWithView: false,
@@ -89,9 +89,9 @@ const predefinedStyles = {
         40000,
         0.6,
         2000000,
-        0.92
-      ]
-    }
+        0.92,
+      ],
+    },
   },
   'circles-zoom': {
     symbol: {
@@ -99,8 +99,8 @@ const predefinedStyles = {
       size: ['interpolate', ['exponential', 2.5], ['zoom'], 2, 1, 14, 32],
       color: '#240572',
       offset: [0, 0],
-      opacity: 0.95
-    }
+      opacity: 0.95,
+    },
   },
   'rotating-bars': {
     symbol: {
@@ -109,7 +109,15 @@ const predefinedStyles = {
       size: [
         'array',
         4,
-        ['interpolate', ['linear'], ['get', 'population'], 20000, 4, 300000, 28]
+        [
+          'interpolate',
+          ['linear'],
+          ['get', 'population'],
+          20000,
+          4,
+          300000,
+          28,
+        ],
       ],
       color: [
         'interpolate',
@@ -118,38 +126,36 @@ const predefinedStyles = {
         20000,
         '#ffdc00',
         300000,
-        '#ff5b19'
+        '#ff5b19',
       ],
       offset: [
         'array',
         0,
-        ['interpolate', ['linear'], ['get', 'population'], 20000, 2, 300000, 14]
-      ]
-    }
+        [
+          'interpolate',
+          ['linear'],
+          ['get', 'population'],
+          20000,
+          2,
+          300000,
+          14,
+        ],
+      ],
+    },
   },
-  'my-circles': {
-    symbol:
-    {
-      symbolType: 'circle',
-      size: 5,
-      color: 'orange',
-      stroke: 'white'
-    }
-
-  }
 };
 
 const map = new Map({
   layers: [
     new TileLayer({
-      source: new OSM()
-    })
+      source: new OSM(),
+    }),
   ],
   target: document.getElementById('map'),
   view: new View({
     center: [0, 0],
-    zoom: 2
-  })
+    zoom: 2,
+  }),
 });
 map.on('click', function (evt) {
   const feature = map.getFeaturesAtPixel(evt.pixel)[0];
@@ -173,7 +179,7 @@ function refreshLayer(newStyle) {
   pointsLayer = new WebGLPointsLayer({
     source: vectorSource,
     style: newStyle,
-    disableHitDetection: false
+    disableHitDetection: true,
   });
   debugger
   map.addLayer(pointsLayer);

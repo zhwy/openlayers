@@ -1,8 +1,8 @@
 /**
  * @module ol/render/canvas/ImageBuilder
  */
-import CanvasInstruction from './Instruction.js';
 import CanvasBuilder from './Builder.js';
+import CanvasInstruction from './Instruction.js';
 
 class CanvasImageBuilder extends CanvasBuilder {
   /**
@@ -31,6 +31,12 @@ class CanvasImageBuilder extends CanvasBuilder {
      * @type {HTMLCanvasElement|HTMLVideoElement|HTMLImageElement}
      */
     this.image_ = null;
+
+    /**
+     * @private
+     * @type {number|undefined}
+     */
+    this.imagePixelRatio_ = undefined;
 
     /**
      * @private
@@ -82,7 +88,7 @@ class CanvasImageBuilder extends CanvasBuilder {
 
     /**
      * @private
-     * @type {number|undefined}
+     * @type {import("../../size.js").Size|undefined}
      */
     this.scale_ = undefined;
 
@@ -91,7 +97,6 @@ class CanvasImageBuilder extends CanvasBuilder {
      * @type {number|undefined}
      */
     this.width_ = undefined;
-
   }
 
   /**
@@ -103,11 +108,19 @@ class CanvasImageBuilder extends CanvasBuilder {
    * @return {number} My end.
    */
   drawCoordinates_(flatCoordinates, offset, end, stride) {
-    return this.appendFlatCoordinates(flatCoordinates, offset, end, stride, false, false);
+    return this.appendFlatCoordinates(
+      flatCoordinates,
+      offset,
+      end,
+      stride,
+      false,
+      false
+    );
   }
 
   /**
-   * @inheritDoc
+   * @param {import("../../geom/Point.js").default|import("../Feature.js").default} pointGeometry Point geometry.
+   * @param {import("../../Feature.js").FeatureLike} feature Feature.
    */
   drawPoint(pointGeometry, feature) {
     if (!this.image_) {
@@ -117,26 +130,57 @@ class CanvasImageBuilder extends CanvasBuilder {
     const flatCoordinates = pointGeometry.getFlatCoordinates();
     const stride = pointGeometry.getStride();
     const myBegin = this.coordinates.length;
-    const myEnd = this.drawCoordinates_(flatCoordinates, 0, flatCoordinates.length, stride);
+    const myEnd = this.drawCoordinates_(
+      flatCoordinates,
+      0,
+      flatCoordinates.length,
+      stride
+    );
     this.instructions.push([
-      CanvasInstruction.DRAW_IMAGE, myBegin, myEnd, this.image_,
+      CanvasInstruction.DRAW_IMAGE,
+      myBegin,
+      myEnd,
+      this.image_,
       // Remaining arguments to DRAW_IMAGE are in alphabetical order
-      this.anchorX_, this.anchorY_, this.declutterGroups_, this.height_, this.opacity_,
-      this.originX_, this.originY_, this.rotateWithView_, this.rotation_,
-      this.scale_ * this.pixelRatio, this.width_
+      this.anchorX_ * this.imagePixelRatio_,
+      this.anchorY_ * this.imagePixelRatio_,
+      this.declutterGroups_,
+      Math.ceil(this.height_ * this.imagePixelRatio_),
+      this.opacity_,
+      this.originX_,
+      this.originY_,
+      this.rotateWithView_,
+      this.rotation_,
+      [
+        (this.scale_[0] * this.pixelRatio) / this.imagePixelRatio_,
+        (this.scale_[1] * this.pixelRatio) / this.imagePixelRatio_,
+      ],
+      Math.ceil(this.width_ * this.imagePixelRatio_),
     ]);
     this.hitDetectionInstructions.push([
-      CanvasInstruction.DRAW_IMAGE, myBegin, myEnd, this.hitDetectionImage_,
+      CanvasInstruction.DRAW_IMAGE,
+      myBegin,
+      myEnd,
+      this.hitDetectionImage_,
       // Remaining arguments to DRAW_IMAGE are in alphabetical order
-      this.anchorX_, this.anchorY_, this.declutterGroups_, this.height_, this.opacity_,
-      this.originX_, this.originY_, this.rotateWithView_, this.rotation_,
-      this.scale_, this.width_
+      this.anchorX_,
+      this.anchorY_,
+      this.declutterGroups_,
+      this.height_,
+      this.opacity_,
+      this.originX_,
+      this.originY_,
+      this.rotateWithView_,
+      this.rotation_,
+      this.scale_,
+      this.width_,
     ]);
     this.endGeometry(feature);
   }
 
   /**
-   * @inheritDoc
+   * @param {import("../../geom/MultiPoint.js").default|import("../Feature.js").default} multiPointGeometry MultiPoint geometry.
+   * @param {import("../../Feature.js").FeatureLike} feature Feature.
    */
   drawMultiPoint(multiPointGeometry, feature) {
     if (!this.image_) {
@@ -147,26 +191,55 @@ class CanvasImageBuilder extends CanvasBuilder {
     const stride = multiPointGeometry.getStride();
     const myBegin = this.coordinates.length;
     const myEnd = this.drawCoordinates_(
-      flatCoordinates, 0, flatCoordinates.length, stride);
+      flatCoordinates,
+      0,
+      flatCoordinates.length,
+      stride
+    );
     this.instructions.push([
-      CanvasInstruction.DRAW_IMAGE, myBegin, myEnd, this.image_,
+      CanvasInstruction.DRAW_IMAGE,
+      myBegin,
+      myEnd,
+      this.image_,
       // Remaining arguments to DRAW_IMAGE are in alphabetical order
-      this.anchorX_, this.anchorY_, this.declutterGroups_, this.height_, this.opacity_,
-      this.originX_, this.originY_, this.rotateWithView_, this.rotation_,
-      this.scale_ * this.pixelRatio, this.width_
+      this.anchorX_ * this.imagePixelRatio_,
+      this.anchorY_ * this.imagePixelRatio_,
+      this.declutterGroups_,
+      Math.ceil(this.height_ * this.imagePixelRatio_),
+      this.opacity_,
+      this.originX_,
+      this.originY_,
+      this.rotateWithView_,
+      this.rotation_,
+      [
+        (this.scale_[0] * this.pixelRatio) / this.imagePixelRatio_,
+        (this.scale_[1] * this.pixelRatio) / this.imagePixelRatio_,
+      ],
+      Math.ceil(this.width_ * this.imagePixelRatio_),
     ]);
     this.hitDetectionInstructions.push([
-      CanvasInstruction.DRAW_IMAGE, myBegin, myEnd, this.hitDetectionImage_,
+      CanvasInstruction.DRAW_IMAGE,
+      myBegin,
+      myEnd,
+      this.hitDetectionImage_,
       // Remaining arguments to DRAW_IMAGE are in alphabetical order
-      this.anchorX_, this.anchorY_, this.declutterGroups_, this.height_, this.opacity_,
-      this.originX_, this.originY_, this.rotateWithView_, this.rotation_,
-      this.scale_, this.width_
+      this.anchorX_,
+      this.anchorY_,
+      this.declutterGroups_,
+      this.height_,
+      this.opacity_,
+      this.originX_,
+      this.originY_,
+      this.rotateWithView_,
+      this.rotation_,
+      this.scale_,
+      this.width_,
     ]);
     this.endGeometry(feature);
   }
 
   /**
-   * @inheritDoc
+   * @return {import("./Builder.js").SerializableInstructions} the serializable instructions.
    */
   finish() {
     this.reverseHitDetectionInstructions();
@@ -175,6 +248,7 @@ class CanvasImageBuilder extends CanvasBuilder {
     this.anchorY_ = undefined;
     this.hitDetectionImage_ = null;
     this.image_ = null;
+    this.imagePixelRatio_ = undefined;
     this.height_ = undefined;
     this.scale_ = undefined;
     this.opacity_ = undefined;
@@ -187,17 +261,19 @@ class CanvasImageBuilder extends CanvasBuilder {
   }
 
   /**
-   * @inheritDoc
+   * @param {import("../../style/Image.js").default} imageStyle Image style.
+   * @param {import("../canvas.js").DeclutterGroup} declutterGroups Declutter.
    */
   setImageStyle(imageStyle, declutterGroups) {
     const anchor = imageStyle.getAnchor();
     const size = imageStyle.getSize();
-    const hitDetectionImage = imageStyle.getHitDetectionImage(1);
-    const image = imageStyle.getImage(1);
+    const hitDetectionImage = imageStyle.getHitDetectionImage();
+    const image = imageStyle.getImage(this.pixelRatio);
     const origin = imageStyle.getOrigin();
+    this.imagePixelRatio_ = imageStyle.getPixelRatio(this.pixelRatio);
     this.anchorX_ = anchor[0];
     this.anchorY_ = anchor[1];
-    this.declutterGroups_ = /** @type {import("../canvas.js").DeclutterGroups} */ (declutterGroups);
+    this.declutterGroups_ = declutterGroups;
     this.hitDetectionImage_ = hitDetectionImage;
     this.image_ = image;
     this.height_ = size[1];
@@ -206,10 +282,9 @@ class CanvasImageBuilder extends CanvasBuilder {
     this.originY_ = origin[1];
     this.rotateWithView_ = imageStyle.getRotateWithView();
     this.rotation_ = imageStyle.getRotation();
-    this.scale_ = imageStyle.getScale();
+    this.scale_ = imageStyle.getScaleArray();
     this.width_ = size[0];
   }
 }
-
 
 export default CanvasImageBuilder;
