@@ -1,6 +1,5 @@
 {
     "typescript.preferences.quoteStyle": "double",
     "javascript.preferences.quoteStyle": "double",
-    "editor.formatOnSave": true,
     "eslint.enable": false
 }
