@@ -32,6 +32,12 @@ class MapBrowserEventHandler extends EventTarget {
     this.clickTimeoutId_;
 
     /**
+     * Emulate dblclick and singleclick. Will be true when only one pointer is active.
+     * @type {boolean}
+     */
+    this.emulateClicks_ = false;
+
+    /**
      * @type {boolean}
      * @private
      */
@@ -140,6 +146,7 @@ class MapBrowserEventHandler extends EventTarget {
     } else {
       // click
       this.clickTimeoutId_ = setTimeout(
+        /** @this {MapBrowserEventHandler} */
         function () {
           this.clickTimeoutId_ = undefined;
           const newEvent = new MapBrowserEvent(
@@ -196,6 +203,7 @@ class MapBrowserEventHandler extends EventTarget {
     // We only fire click, singleclick, and doubleclick if nobody has called
     // event.stopPropagation() or event.preventDefault().
     if (
+      this.emulateClicks_ &&
       !newEvent.propagationStopped &&
       !this.dragging_ &&
       this.isMouseActionButton_(pointerEvent)
@@ -227,6 +235,7 @@ class MapBrowserEventHandler extends EventTarget {
    * @private
    */
   handlePointerDown_(pointerEvent) {
+    this.emulateClicks_ = this.activePointers_ === 0;
     this.updateActivePointers_(pointerEvent);
     const newEvent = new MapBrowserEvent(
       MapBrowserEventType.POINTERDOWN,
@@ -238,19 +247,15 @@ class MapBrowserEventHandler extends EventTarget {
     this.down_ = pointerEvent;
 
     if (this.dragListenerKeys_.length === 0) {
+      const doc = this.map_.getOwnerDocument();
       this.dragListenerKeys_.push(
         listen(
-          document,
+          doc,
           MapBrowserEventType.POINTERMOVE,
           this.handlePointerMove_,
           this
         ),
-        listen(
-          document,
-          MapBrowserEventType.POINTERUP,
-          this.handlePointerUp_,
-          this
-        ),
+        listen(doc, MapBrowserEventType.POINTERUP, this.handlePointerUp_, this),
         /* Note that the listener for `pointercancel is set up on
          * `pointerEventHandler_` and not `documentPointerEventHandler_` like
          * the `pointerup` and `pointermove` listeners.
@@ -271,10 +276,7 @@ class MapBrowserEventHandler extends EventTarget {
           this
         )
       );
-      if (
-        this.element_.getRootNode &&
-        this.element_.getRootNode() !== document
-      ) {
+      if (this.element_.getRootNode && this.element_.getRootNode() !== doc) {
         this.dragListenerKeys_.push(
           listen(
             this.element_.getRootNode(),

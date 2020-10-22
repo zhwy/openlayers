@@ -369,10 +369,7 @@ export function optionsFromCapabilities(wmtsCap, config) {
           return el['Identifier'] == elt['TileMatrixSet'];
         });
         const supportedCRS = tileMatrixSet['SupportedCRS'];
-        const proj1 =
-          getProjection(
-            supportedCRS.replace(/urn:ogc:def:crs:(\w+):(.*:)?(\w+)$/, '$1:$3')
-          ) || getProjection(supportedCRS);
+        const proj1 = getProjection(supportedCRS);
         const proj2 = getProjection(config['projection']);
         if (proj1 && proj2) {
           return equivalent(proj1, proj2);
@@ -434,10 +431,7 @@ export function optionsFromCapabilities(wmtsCap, config) {
   let projection;
   const code = matrixSetObj['SupportedCRS'];
   if (code) {
-    projection =
-      getProjection(
-        code.replace(/urn:ogc:def:crs:(\w+):(.*:)?(\w+)$/, '$1:$3')
-      ) || getProjection(code);
+    projection = getProjection(code);
   }
   if ('projection' in config) {
     const projConfig = getProjection(config['projection']);
@@ -465,10 +459,16 @@ export function optionsFromCapabilities(wmtsCap, config) {
   //in case of matrix limits, use matrix limits to calculate extent
   if (matrixLimits) {
     selectedMatrixLimit = matrixLimits[matrixLimits.length - 1];
-    matrix = find(
+    const m = find(
       matrixSetObj.TileMatrix,
-      (value) => value.Identifier === selectedMatrixLimit.TileMatrix
+      (tileMatrixValue) =>
+        tileMatrixValue.Identifier === selectedMatrixLimit.TileMatrix ||
+        matrixSetObj.Identifier + ':' + tileMatrixValue.Identifier ===
+          selectedMatrixLimit.TileMatrix
     );
+    if (m) {
+      matrix = m;
+    }
   }
 
   const resolution =

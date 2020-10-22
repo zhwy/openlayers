@@ -50,8 +50,8 @@ import {removeNode} from './dom.js';
  * @property {import("./View.js").State} viewState The state of the current view.
  * @property {boolean} animate
  * @property {import("./transform.js").Transform} coordinateToPixelTransform
+ * @property {import("rbush").default} declutterTree
  * @property {null|import("./extent.js").Extent} extent
- * @property {Array<DeclutterItems>} declutterItems
  * @property {number} index
  * @property {Array<import("./layer/Layer.js").State>} layerStatesArray
  * @property {number} layerIndex
@@ -62,12 +62,6 @@ import {removeNode} from './dom.js';
  * @property {!Object<string, Object<string, boolean>>} usedTiles
  * @property {Array<number>} viewHints
  * @property {!Object<string, Object<string, boolean>>} wantedTiles
- */
-
-/**
- * @typedef {Object} DeclutterItems
- * @property {Array<*>} items Declutter items of an executor.
- * @property {number} opacity Layer opacity.
  */
 
 /**
@@ -130,7 +124,7 @@ import {removeNode} from './dom.js';
  * @property {HTMLElement|string} [target] The container for the map, either the
  * element itself or the `id` of the element. If not specified at construction
  * time, {@link module:ol/Map~Map#setTarget} must be called for the map to be
- * rendered.
+ * rendered. If passed by element, the container can be in a secondary document.
  * @property {View} [view] The map's view.  No layer sources will be
  * fetched unless this is specified at construction time or through
  * {@link module:ol/Map~Map#setView}.
@@ -187,7 +181,7 @@ class PluggableMap extends BaseObject {
     /**
      * @private
      */
-    this.animationDelay_ = function () {
+    this.animationDelay_ = /** @this {PluggableMap} */ function () {
       this.animationDelayKey_ = undefined;
       this.renderFrame_(Date.now());
     }.bind(this);
@@ -954,6 +948,15 @@ class PluggableMap extends BaseObject {
   }
 
   /**
+   * @return {!Document} The document where the map is displayed.
+   */
+  getOwnerDocument() {
+    return this.getTargetElement()
+      ? this.getTargetElement().ownerDocument
+      : document;
+  }
+
+  /**
    * @param {import("./Tile.js").default} tile Tile.
    * @param {string} tileSourceKey Tile source key.
    * @param {import("./coordinate.js").Coordinate} tileCenter Tile center.
@@ -996,16 +999,17 @@ class PluggableMap extends BaseObject {
       eventType === EventType.WHEEL ||
       eventType === EventType.KEYDOWN
     ) {
+      const doc = this.getOwnerDocument();
       const rootNode = this.viewport_.getRootNode
         ? this.viewport_.getRootNode()
-        : document;
+        : doc;
       const target =
-        rootNode === document
-          ? /** @type {Node} */ (originalEvent.target)
-          : /** @type {ShadowRoot} */ (rootNode).elementFromPoint(
+        'host' in rootNode // ShadowRoot
+          ? /** @type {ShadowRoot} */ (rootNode).elementFromPoint(
               originalEvent.clientX,
               originalEvent.clientY
-            );
+            )
+          : /** @type {Node} */ (originalEvent.target);
       if (
         // Abort if the target is a child of the container for elements whose events are not meant
         // to be handled by map interactions.
@@ -1014,19 +1018,21 @@ class PluggableMap extends BaseObject {
         // It's possible for the target to no longer be in the page if it has been removed in an
         // event listener, this might happen in a Control that recreates it's content based on
         // user interaction either manually or via a render in something like https://reactjs.org/
-        !(rootNode === document ? document.documentElement : rootNode).contains(
-          target
-        )
+        !(rootNode === doc ? doc.documentElement : rootNode).contains(target)
       ) {
         return;
       }
     }
     mapBrowserEvent.frameState = this.frameState_;
-    const interactionsArray = this.getInteractions().getArray();
     if (this.dispatchEvent(mapBrowserEvent) !== false) {
+      const interactionsArray = this.getInteractions().getArray().slice();
       for (let i = interactionsArray.length - 1; i >= 0; i--) {
         const interaction = interactionsArray[i];
-        if (!interaction.getActive()) {
+        if (
+          interaction.getMap() !== this ||
+          !interaction.getActive() ||
+          !this.getTargetElement()
+        ) {
           continue;
         }
         const cont = interaction.handleEvent(mapBrowserEvent);
@@ -1375,9 +1381,7 @@ class PluggableMap extends BaseObject {
       frameState = {
         animate: false,
         coordinateToPixelTransform: this.coordinateToPixelTransform_,
-        declutterItems: previousFrameState
-          ? previousFrameState.declutterItems
-          : [],
+        declutterTree: null,
         extent: getForViewAndSize(
           viewState.center,
           viewState.resolution,

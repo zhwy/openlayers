@@ -41,7 +41,7 @@ rome.setStyle(
 london.setStyle(
   new Style({
     image: new Icon({
-      color: '#4271AE',
+      color: 'rgba(255, 0, 0, .5)',
       crossOrigin: 'anonymous',
       src: 'data/bigdot.png',
       scale: 0.2,
@@ -91,7 +91,7 @@ const vectorLayer = new VectorLayer({
 
 const rasterLayer = new TileLayer({
   source: new TileJSON({
-    url: 'https://a.tiles.mapbox.com/v3/aj.1x1-degrees.json',
+    url: 'https://a.tiles.mapbox.com/v3/aj.1x1-degrees.json?secure=1',
     crossOrigin: '',
   }),
 });

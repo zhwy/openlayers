@@ -44,6 +44,7 @@ import {listen, unlistenByKey} from '../../events.js';
 
 /**
  * @typedef {Object} Options
+ * @property {string} [className='ol-layer'] A CSS class name to set to the canvas element.
  * @property {Array<CustomAttribute>} [attributes] These attributes will be read from the features in the source and then
  * passed to the GPU. The `name` property of each attribute will serve as its identifier:
  *  * In the vertex shader as an `attribute` by prefixing it with `a_`
@@ -131,6 +132,7 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
     uniforms[DefaultUniform.PROJECTION_MATRIX] = projectionMatrixTransform;
 
     super(layer, {
+      className: options.className,
       uniforms: uniforms,
       postProcesses: options.postProcesses,
     });
@@ -267,6 +269,10 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
     this.worker_ = createWebGLWorker();
     this.worker_.addEventListener(
       'message',
+      /**
+       * @param {*} event Event.
+       * @this {WebGLPointsLayerRenderer}
+       */
       function (event) {
         const received = event.data;
         if (received.type === WebGLWorkerMessageType.GENERATE_BUFFERS) {
@@ -405,6 +411,8 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
    * @return {HTMLElement} The rendered element.
    */
   renderFrame(frameState) {
+    this.preRender(frameState);
+
     const renderCount = this.indicesBuffer_.getSize();
     this.helper.drawElements(0, renderCount);
     this.helper.finalizeDraw(frameState);
@@ -420,6 +428,8 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
       this.renderHitDetection(frameState);
       this.hitRenderTarget_.clearCachedData();
     }
+
+    this.postRender(frameState);
 
     return canvas;
   }
@@ -588,17 +598,10 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
    * @param {number} hitTolerance Hit tolerance in pixels.
    * @param {function(import("../../Feature.js").FeatureLike, import("../../layer/Layer.js").default): T} callback Feature callback.
-   * @param {Array<import("../../Feature.js").FeatureLike>} declutteredFeatures Decluttered features.
    * @return {T|void} Callback result.
    * @template T
    */
-  forEachFeatureAtCoordinate(
-    coordinate,
-    frameState,
-    hitTolerance,
-    callback,
-    declutteredFeatures
-  ) {
+  forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback) {
     assert(this.hitDetectionEnabled_, 66);
     if (!this.hitRenderInstructions_) {
       return;

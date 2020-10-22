@@ -2,6 +2,8 @@
  * @module ol/renderer/webgl/Layer
  */
 import LayerRenderer from '../Layer.js';
+import RenderEvent from '../../render/Event.js';
+import RenderEventType from '../../render/EventType.js';
 import WebGLHelper from '../../webgl/Helper.js';
 
 /**
@@ -35,6 +37,7 @@ export const WebGLWorkerMessageType = {
 
 /**
  * @typedef {Object} Options
+ * @property {string} [className='ol-layer'] A CSS class name to set to the canvas element.
  * @property {Object.<string,import("../../webgl/Helper").UniformValue>} [uniforms] Uniform definitions for the post process steps
  * @property {Array<PostProcessesOptions>} [postProcesses] Post-processes definitions
  */
@@ -63,6 +66,10 @@ class WebGLLayerRenderer extends LayerRenderer {
       postProcesses: options.postProcesses,
       uniforms: options.uniforms,
     });
+
+    if (options.className !== undefined) {
+      this.helper.getCanvas().className = options.className;
+    }
   }
 
   /**
@@ -80,6 +87,36 @@ class WebGLLayerRenderer extends LayerRenderer {
    */
   getShaderCompileErrors() {
     return this.helper.getShaderCompileErrors();
+  }
+
+  /**
+   * @param {import("../../render/EventType.js").default} type Event type.
+   * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
+   * @private
+   */
+  dispatchRenderEvent_(type, frameState) {
+    const layer = this.getLayer();
+    if (layer.hasListener(type)) {
+      // RenderEvent does not get a context or an inversePixelTransform, because WebGL allows much less direct editing than Canvas2d does.
+      const event = new RenderEvent(type, null, frameState, null);
+      layer.dispatchEvent(event);
+    }
+  }
+
+  /**
+   * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
+   * @protected
+   */
+  preRender(frameState) {
+    this.dispatchRenderEvent_(RenderEventType.PRERENDER, frameState);
+  }
+
+  /**
+   * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
+   * @protected
+   */
+  postRender(frameState) {
+    this.dispatchRenderEvent_(RenderEventType.POSTRENDER, frameState);
   }
 }
 

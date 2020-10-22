@@ -28,7 +28,7 @@ class CanvasLineStringBuilder extends CanvasBuilder {
    */
   drawFlatCoordinates_(flatCoordinates, offset, end, stride) {
     const myBegin = this.coordinates.length;
-    const myEnd = this.appendFlatCoordinates(
+    const myEnd = this.appendFlatLineCoordinates(
       flatCoordinates,
       offset,
       end,
@@ -127,7 +127,7 @@ class CanvasLineStringBuilder extends CanvasBuilder {
   }
 
   /**
-   * @return {import("./Builder.js").SerializableInstructions} the serializable instructions.
+   * @return {import("../canvas.js").SerializableInstructions} the serializable instructions.
    */
   finish() {
     const state = this.state;

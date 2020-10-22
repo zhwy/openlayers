@@ -159,6 +159,15 @@ describe('ol.source.TileWMS', function () {
   });
 
   describe('#tileUrlFunction', function () {
+    it('can be used when obtained through #getTileUrlFunction', function () {
+      options.extent = [-80, -40, -50, -10];
+      const source = new TileWMS(options);
+      const tileCoord = [3, 2, 2];
+      expect(function () {
+        source.getTileUrlFunction()(tileCoord, 1, getProjection('EPSG:4326'));
+      }).to.not.throwException();
+    });
+
     it('returns a tile if it is contained within layers extent', function () {
       options.extent = [-80, -40, -50, -10];
       const source = new TileWMS(options);
@@ -329,7 +338,7 @@ describe('ol.source.TileWMS', function () {
       expect(queryData.get('REQUEST')).to.be('GetLegendGraphic');
       expect(queryData.get('SERVICE')).to.be('WMS');
       expect(queryData.get('VERSION')).to.be('1.3.0');
-      expect(queryData.get('SCALE')).to.be('357.14214285714274');
+      expect(queryData.get('SCALE')).to.be('357.14285714285717');
     });
 
     it('does not include SCALE if no resolution was provided', function () {
@@ -365,7 +374,7 @@ describe('ol.source.TileWMS', function () {
       expect(queryData.get('REQUEST')).to.be('GetLegendGraphic');
       expect(queryData.get('SERVICE')).to.be('WMS');
       expect(queryData.get('VERSION')).to.be('1.3.0');
-      expect(queryData.get('SCALE')).to.be('357.14214285714274');
+      expect(queryData.get('SCALE')).to.be('357.14285714285717');
       expect(queryData.get('STYLE')).to.be('STYLE_VALUE');
       expect(queryData.get('FEATURETYPE')).to.be('FEATURETYPE_VALUE');
       expect(queryData.get('RULE')).to.be('RULE_VALUE');
