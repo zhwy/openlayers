@@ -32,6 +32,15 @@ const FullScreenEventType = {
   LEAVEFULLSCREEN: 'leavefullscreen',
 };
 
+/***
+ * @template Return
+ * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes|
+ *     'enterfullscreen'|'leavefullscreen', import("../events/Event.js").default, Return> &
+ *   import("../Observable").OnSignature<import("../ObjectEventType").Types, import("../Object").ObjectEvent, Return> &
+ *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|
+ *     'enterfullscreen'|'leavefullscreen'|import("../ObjectEventType").Types, Return>} FullScreenOnSignature
+ */
+
 /**
  * @typedef {Object} Options
  * @property {string} [className='ol-full-screen'] CSS class name.
@@ -61,7 +70,7 @@ const FullScreenEventType = {
  * element introduced using this parameter will be displayed in full screen.
  *
  * When in full screen mode, a close button is shown to exit full screen mode.
- * The [Fullscreen API](http://www.w3.org/TR/fullscreen/) is used to
+ * The [Fullscreen API](https://www.w3.org/TR/fullscreen/) is used to
  * toggle the map in full screen mode.
  *
  * @fires FullScreenEventType#enterfullscreen
@@ -70,7 +79,7 @@ const FullScreenEventType = {
  */
 class FullScreen extends Control {
   /**
-   * @param {Options=} opt_options Options.
+   * @param {Options} [opt_options] Options.
    */
   constructor(opt_options) {
     const options = opt_options ? opt_options : {};
@@ -79,6 +88,21 @@ class FullScreen extends Control {
       element: document.createElement('div'),
       target: options.target,
     });
+
+    /***
+     * @type {FullScreenOnSignature<import("../Observable.js").OnReturn>}
+     */
+    this.on;
+
+    /***
+     * @type {FullScreenOnSignature<import("../Observable.js").OnReturn>}
+     */
+    this.once;
+
+    /***
+     * @type {FullScreenOnSignature<void>}
+     */
+    this.un;
 
     /**
      * @private

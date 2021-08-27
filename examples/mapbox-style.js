@@ -10,7 +10,7 @@ import TileDebug from "../src/ol/source/TileDebug.js";
 import * as olProj from 'ol/proj';
 import { defaultResolutions } from 'ol-mapbox-style/dist/util.js';
 import FullScreen from '../src/ol/control/FullScreen.js';
-import apply from 'ol-mapbox-style';
+import olms from 'ol-mapbox-style';
 
 // original example
 // apply(
@@ -79,6 +79,4 @@ olms(map, url).then(map => {
 })
 //apply('map', 'https://api.mapbox.com/v4/mapbox.mapbox-streets-v7,mapbox.mapbox-terrain-v2.json?secure&access_token=pk.eyJ1IjoibW14cWFubnkiLCJhIjoiY2pjZmlzNXp3MWJqaDMzdDUxdXMweG15eCJ9.Onu8fH96QnXhOJmqh0bZZA')
 // apply('map', 'https://api.mapbox.cn/v4/mapbox.china-streets-v1,mapbox.mapbox-streets-v7.json?secure&access_token=pk.eyJ1IjoibmF0aGFuODkxMSIsImEiOiJjamh2aWwyZGMwemphM2pwYXdrNnM5YzllIn0.cMSTMVcdiefqYkZ9X6IClA')
-
-
 

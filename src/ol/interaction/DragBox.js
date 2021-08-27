@@ -53,6 +53,13 @@ const DragBoxEventType = {
    * @api
    */
   BOXEND: 'boxend',
+
+  /**
+   * Triggered upon drag box canceled.
+   * @event DragBoxEvent#boxcancel
+   * @api
+   */
+  BOXCANCEL: 'boxcancel',
 };
 
 /**
@@ -86,6 +93,16 @@ export class DragBoxEvent extends Event {
   }
 }
 
+/***
+ * @template Return
+ * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes, import("../events/Event.js").default, Return> &
+ *   import("../Observable").OnSignature<import("../ObjectEventType").Types|
+ *     'change:active', import("../Object").ObjectEvent, Return> &
+ *   import("../Observable").OnSignature<'boxcancel'|'boxdrag'|'boxend', DragBoxEvent, Return> &
+ *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|import("../ObjectEventType").Types|
+ *     'change:active'|'boxcancel'|'boxdrag'|'boxend', Return>} DragBoxOnSignature
+ */
+
 /**
  * @classdesc
  * Allows the user to draw a vector box by clicking and dragging on the map,
@@ -100,10 +117,25 @@ export class DragBoxEvent extends Event {
  */
 class DragBox extends PointerInteraction {
   /**
-   * @param {Options=} opt_options Options.
+   * @param {Options} [opt_options] Options.
    */
   constructor(opt_options) {
     super();
+
+    /***
+     * @type {DragBoxOnSignature<import("../Observable").OnReturn>}
+     */
+    this.on;
+
+    /***
+     * @type {DragBoxOnSignature<import("../Observable").OnReturn>}
+     */
+    this.once;
+
+    /***
+     * @type {DragBoxOnSignature<void>}
+     */
+    this.un;
 
     const options = opt_options ? opt_options : {};
 
@@ -192,22 +224,21 @@ class DragBox extends PointerInteraction {
   handleUpEvent(mapBrowserEvent) {
     this.box_.setMap(null);
 
-    if (
-      this.boxEndCondition_(
-        mapBrowserEvent,
-        this.startPixel_,
-        mapBrowserEvent.pixel
-      )
-    ) {
+    const completeBox = this.boxEndCondition_(
+      mapBrowserEvent,
+      this.startPixel_,
+      mapBrowserEvent.pixel
+    );
+    if (completeBox) {
       this.onBoxEnd(mapBrowserEvent);
-      this.dispatchEvent(
-        new DragBoxEvent(
-          DragBoxEventType.BOXEND,
-          mapBrowserEvent.coordinate,
-          mapBrowserEvent
-        )
-      );
     }
+    this.dispatchEvent(
+      new DragBoxEvent(
+        completeBox ? DragBoxEventType.BOXEND : DragBoxEventType.BOXCANCEL,
+        mapBrowserEvent.coordinate,
+        mapBrowserEvent
+      )
+    );
     return false;
   }
 

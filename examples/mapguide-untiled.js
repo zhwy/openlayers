@@ -4,11 +4,9 @@ import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 
 const mdf = 'Library://Samples/Sheboygan/Maps/Sheboygan.MapDefinition';
-const agentUrl = 'http://138.197.230.93:8008/mapguide/mapagent/mapagent.fcgi?';
+const agentUrl = 'https://mikenunn.net/mapguide/mapagent/mapagent.fcgi?';
 const bounds = [
-  -87.865114442365922,
-  43.665065564837931,
-  -87.595394059497067,
+  -87.865114442365922, 43.665065564837931, -87.595394059497067,
   43.823852564430069,
 ];
 const map = new Map({

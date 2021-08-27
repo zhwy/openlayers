@@ -5,6 +5,27 @@ import EventTarget from './events/Target.js';
 import EventType from './events/EventType.js';
 import {listen, listenOnce, unlistenByKey} from './events.js';
 
+/***
+ * @template {string} Type
+ * @template {Event|import("./events/Event.js").default} EventClass
+ * @template Return
+ * @typedef {(type: Type|Type[], listener: (event: EventClass) => ?) => Return} OnSignature
+ */
+
+/***
+ * @template {string} Type
+ * @template Return
+ * @typedef {(type: Type[], listener: (event: Event|import("./events/Event").default) => ?) => Return} CombinedOnSignature
+ */
+
+/***
+ * @typedef {import("./events").EventsKey|Array<import("./events").EventsKey>} OnReturn
+ */
+
+/**
+ * @typedef {'change'|'error'} EventTypes
+ */
+
 /**
  * @classdesc
  * Abstract base class; normally only used for creating subclasses and not
@@ -19,6 +40,21 @@ import {listen, listenOnce, unlistenByKey} from './events.js';
 class Observable extends EventTarget {
   constructor() {
     super();
+
+    /***
+     * @type {OnSignature<EventTypes, import("./events/Event.js").default, OnReturn>}
+     */
+    this.on = this.onInternal;
+
+    /***
+     * @type {OnSignature<EventTypes, import("./events/Event.js").default, OnReturn>}
+     */
+    this.once = this.onceInternal;
+
+    /***
+     * @type {OnSignature<EventTypes, import("./events/Event.js").default, void>}
+     */
+    this.un = this.unInternal;
 
     /**
      * @private
@@ -47,15 +83,12 @@ class Observable extends EventTarget {
   }
 
   /**
-   * Listen for a certain type of event.
-   * @param {string|Array<string>} type The event type or array of event types.
-   * @param {function(?): ?} listener The listener function.
-   * @return {import("./events.js").EventsKey|Array<import("./events.js").EventsKey>} Unique key for the listener. If
-   *     called with an array of event types as the first argument, the return
-   *     will be an array of keys.
-   * @api
+   * @param {string|Array<string>} type Type.
+   * @param {function(?): ?} listener Listener.
+   * @return {import("./events.js").EventsKey|Array<import("./events.js").EventsKey>} Event key.
+   * @protected
    */
-  on(type, listener) {
+  onInternal(type, listener) {
     if (Array.isArray(type)) {
       const len = type.length;
       const keys = new Array(len);
@@ -69,15 +102,12 @@ class Observable extends EventTarget {
   }
 
   /**
-   * Listen once for a certain type of event.
-   * @param {string|Array<string>} type The event type or array of event types.
-   * @param {function(?): ?} listener The listener function.
-   * @return {import("./events.js").EventsKey|Array<import("./events.js").EventsKey>} Unique key for the listener. If
-   *     called with an array of event types as the first argument, the return
-   *     will be an array of keys.
-   * @api
+   * @param {string|Array<string>} type Type.
+   * @param {function(?): ?} listener Listener.
+   * @return {import("./events.js").EventsKey|Array<import("./events.js").EventsKey>} Event key.
+   * @protected
    */
-  once(type, listener) {
+  onceInternal(type, listener) {
     let key;
     if (Array.isArray(type)) {
       const len = type.length;
@@ -94,11 +124,11 @@ class Observable extends EventTarget {
 
   /**
    * Unlisten for a certain type of event.
-   * @param {string|Array<string>} type The event type or array of event types.
-   * @param {function(?): ?} listener The listener function.
-   * @api
+   * @param {string|Array<string>} type Type.
+   * @param {function(?): ?} listener Listener.
+   * @protected
    */
-  un(type, listener) {
+  unInternal(type, listener) {
     const key = /** @type {Object} */ (listener).ol_key;
     if (key) {
       unByKey(key);
@@ -111,6 +141,39 @@ class Observable extends EventTarget {
     }
   }
 }
+
+/**
+ * Listen for a certain type of event.
+ * @function
+ * @param {string|Array<string>} type The event type or array of event types.
+ * @param {function((Event|import("./events/Event").default)): ?} listener The listener function.
+ * @return {import("./events.js").EventsKey|Array<import("./events.js").EventsKey>} Unique key for the listener. If
+ *     called with an array of event types as the first argument, the return
+ *     will be an array of keys.
+ * @api
+ */
+Observable.prototype.on;
+
+/**
+ * Listen once for a certain type of event.
+ * @function
+ * @param {string|Array<string>} type The event type or array of event types.
+ * @param {function((Event|import("./events/Event").default)): ?} listener The listener function.
+ * @return {import("./events.js").EventsKey|Array<import("./events.js").EventsKey>} Unique key for the listener. If
+ *     called with an array of event types as the first argument, the return
+ *     will be an array of keys.
+ * @api
+ */
+Observable.prototype.once;
+
+/**
+ * Unlisten for a certain type of event.
+ * @function
+ * @param {string|Array<string>} type The event type or array of event types.
+ * @param {function((Event|import("./events/Event").default)): ?} listener The listener function.
+ * @api
+ */
+Observable.prototype.un;
 
 /**
  * Removes an event listener using the key returned by `on()` or `once()`.

@@ -16,10 +16,10 @@ import {
   getIntersection,
   getTopLeft,
 } from '../../extent.js';
-import {createTransformString} from '../../render/canvas.js';
 import {fromUserExtent} from '../../proj.js';
 import {getUid} from '../../util.js';
 import {numberSafeCompareFunction} from '../../array.js';
+import {toString as toTransformString} from '../../transform.js';
 
 /**
  * @classdesc
@@ -280,7 +280,7 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
       -height / 2
     );
 
-    const canvasTransform = createTransformString(this.pixelTransform);
+    const canvasTransform = toTransformString(this.pixelTransform);
 
     this.useContainer(target, canvasTransform, layerState.opacity);
     const context = this.context;
@@ -356,18 +356,18 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
         tilePixelRatio * tileSource.getGutterForProjection(projection);
       const tilesToDraw = tilesToDrawByZ[currentZ];
       for (const tileCoordKey in tilesToDraw) {
-        const tile = /** @type {import("../../ImageTile.js").default} */ (tilesToDraw[
-          tileCoordKey
-        ]);
+        const tile = /** @type {import("../../ImageTile.js").default} */ (
+          tilesToDraw[tileCoordKey]
+        );
         const tileCoord = tile.tileCoord;
 
         // Calculate integer positions and sizes so that tiles align
-        const floatX = origin[0] - (originTileCoord[1] - tileCoord[1]) * dx;
-        const nextX = Math.round(floatX + dx);
-        const floatY = origin[1] - (originTileCoord[2] - tileCoord[2]) * dy;
-        const nextY = Math.round(floatY + dy);
-        const x = Math.round(floatX);
-        const y = Math.round(floatY);
+        const xIndex = originTileCoord[1] - tileCoord[1];
+        const nextX = Math.round(origin[0] - (xIndex - 1) * dx);
+        const yIndex = originTileCoord[2] - tileCoord[2];
+        const nextY = Math.round(origin[1] - (yIndex - 1) * dy);
+        const x = Math.round(origin[0] - xIndex * dx);
+        const y = Math.round(origin[1] - yIndex * dy);
         const w = nextX - x;
         const h = nextY - y;
         const transition = z === currentZ;
@@ -415,8 +415,10 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
         );
         if (clips && !inTransition) {
           context.restore();
+          this.renderedTiles.unshift(tile);
+        } else {
+          this.renderedTiles.push(tile);
         }
-        this.renderedTiles.push(tile);
         this.updateUsedTiles(frameState.usedTiles, tileSource, tile);
       }
     }
@@ -541,7 +543,9 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
       }.bind(null, tileSource);
 
       frameState.postRenderFunctions.push(
-        /** @type {import("../../PluggableMap.js").PostRenderFunction} */ (postRenderFunction)
+        /** @type {import("../../PluggableMap.js").PostRenderFunction} */ (
+          postRenderFunction
+        )
       );
     }
   }
@@ -576,7 +580,7 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
    * @param {import("../../extent.js").Extent} extent Extent.
    * @param {number} currentZ Current Z.
    * @param {number} preload Load low resolution tiles up to 'preload' levels.
-   * @param {function(import("../../Tile.js").default)=} opt_tileCallback Tile callback.
+   * @param {function(import("../../Tile.js").default):void} [opt_tileCallback] Tile callback.
    * @protected
    */
   manageTilePyramid(

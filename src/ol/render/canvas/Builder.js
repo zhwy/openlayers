@@ -256,9 +256,15 @@ class CanvasBuilder extends VectorContext {
     let flatCoordinates, builderEnd, builderEnds, builderEndss;
     let offset;
     if (type == GeometryType.MULTI_POLYGON) {
-      flatCoordinates = /** @type {import("../../geom/MultiPolygon.js").default} */ (geometry).getOrientedFlatCoordinates();
+      flatCoordinates =
+        /** @type {import("../../geom/MultiPolygon.js").default} */ (
+          geometry
+        ).getOrientedFlatCoordinates();
       builderEndss = [];
-      const endss = /** @type {import("../../geom/MultiPolygon.js").default} */ (geometry).getEndss();
+      const endss =
+        /** @type {import("../../geom/MultiPolygon.js").default} */ (
+          geometry
+        ).getEndss();
       offset = 0;
       for (let i = 0, ii = endss.length; i < ii; ++i) {
         const myEnds = [];
@@ -286,12 +292,16 @@ class CanvasBuilder extends VectorContext {
       builderEnds = [];
       flatCoordinates =
         type == GeometryType.POLYGON
-          ? /** @type {import("../../geom/Polygon.js").default} */ (geometry).getOrientedFlatCoordinates()
+          ? /** @type {import("../../geom/Polygon.js").default} */ (
+              geometry
+            ).getOrientedFlatCoordinates()
           : geometry.getFlatCoordinates();
       offset = this.drawCustomCoordinates_(
         flatCoordinates,
         0,
-        /** @type {import("../../geom/Polygon.js").default|import("../../geom/MultiLineString.js").default} */ (geometry).getEnds(),
+        /** @type {import("../../geom/Polygon.js").default|import("../../geom/MultiLineString.js").default} */ (
+          geometry
+        ).getEnds(),
         stride,
         builderEnds
       );
@@ -303,7 +313,10 @@ class CanvasBuilder extends VectorContext {
         renderer,
         inflateCoordinatesArray,
       ]);
-    } else if (type == GeometryType.LINE_STRING) {
+    } else if (
+      type == GeometryType.LINE_STRING ||
+      type == GeometryType.CIRCLE
+    ) {
       flatCoordinates = geometry.getFlatCoordinates();
       builderEnd = this.appendFlatLineCoordinates(
         flatCoordinates,
@@ -355,19 +368,18 @@ class CanvasBuilder extends VectorContext {
    * @param {import("../../Feature.js").FeatureLike} feature Feature.
    */
   beginGeometry(geometry, feature) {
-    const extent = geometry.getExtent();
     this.beginGeometryInstruction1_ = [
       CanvasInstruction.BEGIN_GEOMETRY,
       feature,
       0,
-      extent,
+      geometry,
     ];
     this.instructions.push(this.beginGeometryInstruction1_);
     this.beginGeometryInstruction2_ = [
       CanvasInstruction.BEGIN_GEOMETRY,
       feature,
       0,
-      extent,
+      geometry,
     ];
     this.hitDetectionInstructions.push(this.beginGeometryInstruction2_);
   }

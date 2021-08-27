@@ -47,7 +47,7 @@ The default `geometryFunction` can only handle `ol/geom/Point` geometries.
 
 ### 11
 
-`options.featureTypes` should be an Array.
+`options.featureTypes` must be an Array.
 
 ### 12
 
@@ -111,7 +111,7 @@ Features for `updates` must have an id set by the feature reader or `ol.Feature#
 
 ### 28
 
-`renderMode` must be `'image'`, `'hybrid'` or `'vector'`.
+`renderMode` must be `'hybrid'` or `'vector'`.
 
 ### 29
 

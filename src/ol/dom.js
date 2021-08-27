@@ -7,12 +7,18 @@ import {WORKER_OFFSCREEN_CANVAS} from './has.js';
 //FIXME Move this function to the canvas module
 /**
  * Create an html canvas element and returns its 2d context.
- * @param {number=} opt_width Canvas width.
- * @param {number=} opt_height Canvas height.
- * @param {Array<HTMLCanvasElement>=} opt_canvasPool Canvas pool to take existing canvas from.
+ * @param {number} [opt_width] Canvas width.
+ * @param {number} [opt_height] Canvas height.
+ * @param {Array<HTMLCanvasElement>} [opt_canvasPool] Canvas pool to take existing canvas from.
+ * @param {CanvasRenderingContext2DSettings} [opt_Context2DSettings] CanvasRenderingContext2DSettings
  * @return {CanvasRenderingContext2D} The context.
  */
-export function createCanvasContext2D(opt_width, opt_height, opt_canvasPool) {
+export function createCanvasContext2D(
+  opt_width,
+  opt_height,
+  opt_canvasPool,
+  opt_Context2DSettings
+) {
   const canvas =
     opt_canvasPool && opt_canvasPool.length
       ? opt_canvasPool.shift()
@@ -26,7 +32,9 @@ export function createCanvasContext2D(opt_width, opt_height, opt_canvasPool) {
     canvas.height = opt_height;
   }
   //FIXME Allow OffscreenCanvasRenderingContext2D as return type
-  return /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
+  return /** @type {CanvasRenderingContext2D} */ (
+    canvas.getContext('2d', opt_Context2DSettings)
+  );
 }
 
 /**
@@ -72,7 +80,7 @@ export function replaceNode(newNode, oldNode) {
 
 /**
  * @param {Node} node The node to remove.
- * @returns {Node} The node that was removed or null.
+ * @return {Node} The node that was removed or null.
  */
 export function removeNode(node) {
   return node && node.parentNode ? node.parentNode.removeChild(node) : null;

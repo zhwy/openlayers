@@ -6,6 +6,11 @@ import CanvasLayerRenderer from './Layer.js';
 import ExecutorGroup from '../../render/canvas/ExecutorGroup.js';
 import ViewHint from '../../ViewHint.js';
 import {
+  HIT_DETECT_RESOLUTION,
+  createHitDetectionImageData,
+  hitDetect,
+} from '../../render/canvas/hitdetect.js';
+import {
   apply,
   makeInverse,
   makeScale,
@@ -20,15 +25,12 @@ import {
   wrapX as wrapExtentX,
 } from '../../extent.js';
 import {
-  createHitDetectionImageData,
-  hitDetect,
-} from '../../render/canvas/hitdetect.js';
-import {
   defaultOrder as defaultRenderOrder,
   getTolerance as getRenderTolerance,
   getSquaredTolerance as getSquaredRenderTolerance,
   renderFeature,
 } from '../vector.js';
+import {equals} from '../../array.js';
 import {
   fromUserExtent,
   getTransformFromProjections,
@@ -94,6 +96,12 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
 
     /**
      * @private
+     * @type {import("../../extent.js").Extent}
+     */
+    this.wrappedRenderedExtent_ = createEmpty();
+
+    /**
+     * @private
      * @type {number}
      */
     this.renderedRotation_;
@@ -156,7 +164,7 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
   /**
    * @param {ExecutorGroup} executorGroup Executor group.
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
-   * @param {import("rbush").default=} opt_declutterTree Declutter tree.
+   * @param {import("rbush").default} [opt_declutterTree] Declutter tree.
    */
   renderWorlds(executorGroup, frameState, opt_declutterTree) {
     const extent = frameState.extent;
@@ -272,17 +280,19 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
 
     // clipped rendering if layer extent is set
     let clipped = false;
+    let render = true;
     if (layerState.extent && this.clipping) {
       const layerExtent = fromUserExtent(layerState.extent, projection);
-      clipped =
-        !containsExtent(layerExtent, frameState.extent) &&
-        intersectsExtent(layerExtent, frameState.extent);
+      render = intersectsExtent(layerExtent, frameState.extent);
+      clipped = render && !containsExtent(layerExtent, frameState.extent);
       if (clipped) {
         this.clipUnrotated(context, frameState, layerExtent);
       }
     }
 
-    this.renderWorlds(replayGroup, frameState);
+    if (render) {
+      this.renderWorlds(replayGroup, frameState);
+    }
 
     if (clipped) {
       context.restore();
@@ -322,17 +332,17 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
           const resolution = this.renderedResolution_;
           const rotation = this.renderedRotation_;
           const projection = this.renderedProjection_;
-          const extent = this.renderedExtent_;
+          const extent = this.wrappedRenderedExtent_;
           const layer = this.getLayer();
           const transforms = [];
-          const width = size[0] / 2;
-          const height = size[1] / 2;
+          const width = size[0] * HIT_DETECT_RESOLUTION;
+          const height = size[1] * HIT_DETECT_RESOLUTION;
           transforms.push(
             this.getRenderTransform(
               center,
               resolution,
               rotation,
-              0.5,
+              HIT_DETECT_RESOLUTION,
               width,
               height,
               0
@@ -357,7 +367,7 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
                   center,
                   resolution,
                   rotation,
-                  0.5,
+                  HIT_DETECT_RESOLUTION,
                   width,
                   height,
                   offsetX
@@ -375,7 +385,7 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
                   center,
                   resolution,
                   rotation,
-                  0.5,
+                  HIT_DETECT_RESOLUTION,
                   width,
                   height,
                   offsetX
@@ -406,55 +416,82 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
    * @param {import("../../coordinate.js").Coordinate} coordinate Coordinate.
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
    * @param {number} hitTolerance Hit tolerance in pixels.
-   * @param {function(import("../../Feature.js").FeatureLike, import("../../layer/Layer.js").default): T} callback Feature callback.
-   * @return {T|void} Callback result.
+   * @param {import("../vector.js").FeatureCallback<T>} callback Feature callback.
+   * @param {Array<import("../Map.js").HitMatch<T>>} matches The hit detected matches with tolerance.
+   * @return {T|undefined} Callback result.
    * @template T
    */
-  forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback) {
+  forEachFeatureAtCoordinate(
+    coordinate,
+    frameState,
+    hitTolerance,
+    callback,
+    matches
+  ) {
     if (!this.replayGroup_) {
       return undefined;
-    } else {
-      const resolution = frameState.viewState.resolution;
-      const rotation = frameState.viewState.rotation;
-      const layer = this.getLayer();
-
-      /** @type {!Object<string, boolean>} */
-      const features = {};
-
-      /**
-       * @param {import("../../Feature.js").FeatureLike} feature Feature.
-       * @return {?} Callback result.
-       */
-      const featureCallback = function (feature) {
-        const key = getUid(feature);
-        if (!(key in features)) {
-          features[key] = true;
-          return callback(feature, layer);
-        }
-      };
-
-      let result;
-      const executorGroups = [this.replayGroup_];
-      if (this.declutterExecutorGroup) {
-        executorGroups.push(this.declutterExecutorGroup);
-      }
-      executorGroups.forEach((executorGroup) => {
-        result =
-          result ||
-          executorGroup.forEachFeatureAtCoordinate(
-            coordinate,
-            resolution,
-            rotation,
-            hitTolerance,
-            featureCallback,
-            executorGroup === this.declutterExecutorGroup
-              ? frameState.declutterTree.all().map((item) => item.value)
-              : null
-          );
-      });
-
-      return result;
     }
+    const resolution = frameState.viewState.resolution;
+    const rotation = frameState.viewState.rotation;
+    const layer = this.getLayer();
+
+    /** @type {!Object<string, import("../Map.js").HitMatch<T>|true>} */
+    const features = {};
+
+    /**
+     * @param {import("../../Feature.js").FeatureLike} feature Feature.
+     * @param {import("../../geom/SimpleGeometry.js").default} geometry Geometry.
+     * @param {number} distanceSq The squared distance to the click position
+     * @return {T|undefined} Callback result.
+     */
+    const featureCallback = function (feature, geometry, distanceSq) {
+      const key = getUid(feature);
+      const match = features[key];
+      if (!match) {
+        if (distanceSq === 0) {
+          features[key] = true;
+          return callback(feature, layer, geometry);
+        }
+        matches.push(
+          (features[key] = {
+            feature: feature,
+            layer: layer,
+            geometry: geometry,
+            distanceSq: distanceSq,
+            callback: callback,
+          })
+        );
+      } else if (match !== true && distanceSq < match.distanceSq) {
+        if (distanceSq === 0) {
+          features[key] = true;
+          matches.splice(matches.lastIndexOf(match), 1);
+          return callback(feature, layer, geometry);
+        }
+        match.geometry = geometry;
+        match.distanceSq = distanceSq;
+      }
+      return undefined;
+    };
+
+    let result;
+    const executorGroups = [this.replayGroup_];
+    if (this.declutterExecutorGroup) {
+      executorGroups.push(this.declutterExecutorGroup);
+    }
+    executorGroups.some((executorGroup) => {
+      return (result = executorGroup.forEachFeatureAtCoordinate(
+        coordinate,
+        resolution,
+        rotation,
+        hitTolerance,
+        featureCallback,
+        executorGroup === this.declutterExecutorGroup
+          ? frameState.declutterTree.all().map((item) => item.value)
+          : null
+      ));
+    });
+
+    return result;
   }
 
   /**
@@ -520,6 +557,7 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
       frameStateExtent,
       vectorLayerRenderBuffer * resolution
     );
+    const renderedExtent = extent.slice();
     const loadExtents = [extent.slice()];
     const projectionExtent = projection.getExtent();
 
@@ -568,8 +606,13 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
       this.renderedResolution_ == resolution &&
       this.renderedRevision_ == vectorLayerRevision &&
       this.renderedRenderOrder_ == vectorLayerRenderOrder &&
-      containsExtent(this.renderedExtent_, extent)
+      containsExtent(this.wrappedRenderedExtent_, extent)
     ) {
+      if (!equals(this.renderedExtent_, renderedExtent)) {
+        this.hitDetectionImageData_ = null;
+        this.renderedExtent_ = renderedExtent;
+      }
+      this.renderedCenter_ = center;
       this.replayGroupChanged = false;
       return true;
     }
@@ -674,7 +717,8 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
     this.renderedResolution_ = resolution;
     this.renderedRevision_ = vectorLayerRevision;
     this.renderedRenderOrder_ = vectorLayerRenderOrder;
-    this.renderedExtent_ = extent;
+    this.renderedExtent_ = renderedExtent;
+    this.wrappedRenderedExtent_ = extent;
     this.renderedCenter_ = center;
     this.renderedProjection_ = projection;
     this.replayGroup_ = executorGroup;
@@ -689,8 +733,8 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
    * @param {number} squaredTolerance Squared render tolerance.
    * @param {import("../../style/Style.js").default|Array<import("../../style/Style.js").default>} styles The style or array of styles.
    * @param {import("../../render/canvas/BuilderGroup.js").default} builderGroup Builder group.
-   * @param {import("../../proj.js").TransformFunction=} opt_transform Transform from user to view projection.
-   * @param {import("../../render/canvas/BuilderGroup.js").default=} opt_declutterBuilderGroup Builder for decluttering.
+   * @param {import("../../proj.js").TransformFunction} [opt_transform] Transform from user to view projection.
+   * @param {import("../../render/canvas/BuilderGroup.js").default} [opt_declutterBuilderGroup] Builder for decluttering.
    * @return {boolean} `true` if an image is loading.
    */
   renderFeature(

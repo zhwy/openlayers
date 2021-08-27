@@ -63,18 +63,14 @@ class CanvasVectorImageLayerRenderer extends CanvasImageLayerRenderer {
    * @return {Promise<Array<import("../../Feature").default>>} Promise that resolves with an array of features.
    */
   getFeatures(pixel) {
-    if (this.vectorRenderer_) {
-      const vectorPixel = apply(
-        this.coordinateToVectorPixelTransform_,
-        apply(this.renderedPixelToCoordinateTransform_, pixel.slice())
-      );
-      return this.vectorRenderer_.getFeatures(vectorPixel);
-    } else {
-      const promise = new Promise(function (resolve, reject) {
-        resolve([]);
-      });
-      return promise;
+    if (!this.vectorRenderer_) {
+      return new Promise((resolve) => resolve([]));
     }
+    const vectorPixel = apply(
+      this.coordinateToVectorPixelTransform_,
+      apply(this.renderedPixelToCoordinateTransform_, pixel.slice())
+    );
+    return this.vectorRenderer_.getFeatures(vectorPixel);
   }
 
   /**
@@ -111,22 +107,19 @@ class CanvasVectorImageLayerRenderer extends CanvasImageLayerRenderer {
     ) {
       vectorRenderer.useContainer(null, null, 1);
       const context = vectorRenderer.context;
-      const imageFrameState = /** @type {import("../../PluggableMap.js").FrameState} */ (assign(
-        {},
-        frameState,
-        {
-          declutterTree: new RBush(9),
-          extent: renderedExtent,
-          size: [width, height],
-          viewState: /** @type {import("../../View.js").State} */ (assign(
-            {},
-            frameState.viewState,
-            {
-              rotation: 0,
-            }
-          )),
-        }
-      ));
+      const imageFrameState =
+        /** @type {import("../../PluggableMap.js").FrameState} */ (
+          assign({}, frameState, {
+            declutterTree: new RBush(9),
+            extent: renderedExtent,
+            size: [width, height],
+            viewState: /** @type {import("../../View.js").State} */ (
+              assign({}, frameState.viewState, {
+                rotation: 0,
+              })
+            ),
+          })
+        );
       const image = new ImageCanvas(
         renderedExtent,
         viewResolution,
@@ -172,7 +165,8 @@ class CanvasVectorImageLayerRenderer extends CanvasImageLayerRenderer {
     }
 
     if (this.image_) {
-      this.renderedPixelToCoordinateTransform_ = frameState.pixelToCoordinateTransform.slice();
+      this.renderedPixelToCoordinateTransform_ =
+        frameState.pixelToCoordinateTransform.slice();
     }
 
     return !!this.image_;
@@ -194,24 +188,33 @@ class CanvasVectorImageLayerRenderer extends CanvasImageLayerRenderer {
    * @param {import("../../coordinate.js").Coordinate} coordinate Coordinate.
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
    * @param {number} hitTolerance Hit tolerance in pixels.
-   * @param {function(import("../../Feature.js").FeatureLike, import("../../layer/Layer.js").default): T} callback Feature callback.
-   * @return {T|void} Callback result.
+   * @param {import("../vector.js").FeatureCallback<T>} callback Feature callback.
+   * @param {Array<import("../Map.js").HitMatch<T>>} matches The hit detected matches with tolerance.
+   * @return {T|undefined} Callback result.
    * @template T
    */
-  forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback) {
+  forEachFeatureAtCoordinate(
+    coordinate,
+    frameState,
+    hitTolerance,
+    callback,
+    matches
+  ) {
     if (this.vectorRenderer_) {
       return this.vectorRenderer_.forEachFeatureAtCoordinate(
         coordinate,
         frameState,
         hitTolerance,
-        callback
+        callback,
+        matches
       );
     } else {
       return super.forEachFeatureAtCoordinate(
         coordinate,
         frameState,
         hitTolerance,
-        callback
+        callback,
+        matches
       );
     }
   }

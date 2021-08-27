@@ -38,13 +38,13 @@ const SelectEventType = {
  * @property {import("../events/condition.js").Condition} [addCondition] A function
  * that takes an {@link module:ol/MapBrowserEvent~MapBrowserEvent} and returns a
  * boolean to indicate whether that event should be handled.
- * By default, this is {@link module:ol/events/condition~never}. Use this if you
+ * By default, this is {@link module:ol/events/condition.never}. Use this if you
  * want to use different events for add and remove instead of `toggle`.
  * @property {import("../events/condition.js").Condition} [condition] A function that
  * takes an {@link module:ol/MapBrowserEvent~MapBrowserEvent} and returns a
  * boolean to indicate whether that event should be handled. This is the event
  * for the selected features as a whole. By default, this is
- * {@link module:ol/events/condition~singleClick}. Clicking on a feature selects that
+ * {@link module:ol/events/condition.singleClick}. Clicking on a feature selects that
  * feature and removes any that were in the selection. Clicking outside any
  * feature removes all from the selection.
  * See `toggle`, `add`, `remove` options for adding/removing extra features to/
@@ -63,13 +63,13 @@ const SelectEventType = {
  * @property {import("../events/condition.js").Condition} [removeCondition] A function
  * that takes an {@link module:ol/MapBrowserEvent~MapBrowserEvent} and returns a
  * boolean to indicate whether that event should be handled.
- * By default, this is {@link module:ol/events/condition~never}. Use this if you
+ * By default, this is {@link module:ol/events/condition.never}. Use this if you
  * want to use different events for add and remove instead of `toggle`.
  * @property {import("../events/condition.js").Condition} [toggleCondition] A function
  * that takes an {@link module:ol/MapBrowserEvent~MapBrowserEvent} and returns a
  * boolean to indicate whether that event should be handled. This is in addition
  * to the `condition` event. By default,
- * {@link module:ol/events/condition~shiftKeyOnly}, i.e. pressing `shift` as
+ * {@link module:ol/events/condition.shiftKeyOnly}, i.e. pressing `shift` as
  * well as the `condition` event, adds that feature to the current selection if
  * it is not currently selected, and removes it if it is. See `add` and `remove`
  * if you want to use different events instead of a toggle.
@@ -130,9 +130,19 @@ export class SelectEvent extends Event {
 
 /**
  * Original feature styles to reset to when features are no longer selected.
- * @type {Object.<number, import("../style/Style.js").default|Array.<import("../style/Style.js").default>|import("../style/Style.js").StyleFunction>}
+ * @type {Object<number, import("../style/Style.js").default|Array<import("../style/Style.js").default>|import("../style/Style.js").StyleFunction>}
  */
 const originalFeatureStyles = {};
+
+/***
+ * @template Return
+ * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes, import("../events/Event.js").default, Return> &
+ *   import("../Observable").OnSignature<import("../ObjectEventType").Types|
+ *     'change:active', import("../Object").ObjectEvent, Return> &
+ *   import("../Observable").OnSignature<'select', SelectEvent, Return> &
+ *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|import("../ObjectEventType").Types|
+ *     'change:active'|'select', Return>} SelectOnSignature
+ */
 
 /**
  * @classdesc
@@ -151,10 +161,25 @@ const originalFeatureStyles = {};
  */
 class Select extends Interaction {
   /**
-   * @param {Options=} opt_options Options.
+   * @param {Options} [opt_options] Options.
    */
   constructor(opt_options) {
     super();
+
+    /***
+     * @type {SelectOnSignature<import("../Observable.js").OnReturn>}
+     */
+    this.on;
+
+    /***
+     * @type {SelectOnSignature<import("../Observable.js").OnReturn>}
+     */
+    this.once;
+
+    /***
+     * @type {SelectOnSignature<void>}
+     */
+    this.un;
 
     const options = opt_options ? opt_options : {};
 
@@ -216,7 +241,7 @@ class Select extends Interaction {
 
     /**
      * @private
-     * @type {import("../style/Style.js").default|Array.<import("../style/Style.js").default>|import("../style/Style.js").StyleFunction|null}
+     * @type {import("../style/Style.js").default|Array<import("../style/Style.js").default>|import("../style/Style.js").StyleFunction|null}
      */
     this.style_ =
       options.style !== undefined ? options.style : getDefaultStyleFunction();
@@ -277,7 +302,7 @@ class Select extends Interaction {
 
   /**
    * Returns the Hit-detection tolerance.
-   * @returns {number} Hit tolerance in pixels.
+   * @return {number} Hit tolerance in pixels.
    * @api
    */
   getHitTolerance() {
@@ -294,8 +319,9 @@ class Select extends Interaction {
    * @api
    */
   getLayer(feature) {
-    return /** @type {import('../layer/Vector.js').default} */ (this
-      .featureLayerAssociation_[getUid(feature)]);
+    return /** @type {import('../layer/Vector.js').default} */ (
+      this.featureLayerAssociation_[getUid(feature)]
+    );
   }
 
   /**

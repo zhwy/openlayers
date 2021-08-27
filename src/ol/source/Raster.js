@@ -223,7 +223,7 @@ export class Processor extends Disposable {
 
   /**
    * Run operation on input data.
-   * @param {Array.<Array|ImageData>} inputs Array of pixels or image data
+   * @param {Array<Array|ImageData>} inputs Array of pixels or image data
    *     (depending on the operation type).
    * @param {Object} meta A user data object.  This is passed to all operations
    *     and must be serializable.
@@ -367,9 +367,10 @@ export class Processor extends Disposable {
  * pixels, where each pixel is an array of four numbers (`[r, g, b, a]`) in the
  * range of 0 - 255. It should return a single pixel array.
  * For `'image'` type operations, functions will be called with an array of
- * {@link ImageData https://developer.mozilla.org/en-US/docs/Web/API/ImageData}
- * and should return a single {@link ImageData
- * https://developer.mozilla.org/en-US/docs/Web/API/ImageData}.  The operations
+ * [ImageData](https://developer.mozilla.org/en-US/docs/Web/API/ImageData)
+ * and should return a single
+ * [ImageData](https://developer.mozilla.org/en-US/docs/Web/API/ImageData).
+ * The operations
  * are called with a second "data" argument, which can be used for storage.  The
  * data object is accessible from raster events, where it can be initialized in
  * "beforeoperations" and accessed again in "afteroperations".
@@ -597,7 +598,7 @@ class RasterSource extends ImageSource {
   /**
    * Set the operation.
    * @param {Operation} operation New operation.
-   * @param {Object=} opt_lib Functions that will be available to operations run
+   * @param {Object} [opt_lib] Functions that will be available to operations run
    *     in a worker.
    * @api
    */
@@ -625,15 +626,13 @@ class RasterSource extends ImageSource {
    * @private
    */
   updateFrameState_(extent, resolution, projection) {
-    const frameState = /** @type {import("../PluggableMap.js").FrameState} */ (assign(
-      {},
-      this.frameState_
-    ));
+    const frameState = /** @type {import("../PluggableMap.js").FrameState} */ (
+      assign({}, this.frameState_)
+    );
 
-    frameState.viewState = /** @type {import("../View.js").State} */ (assign(
-      {},
-      frameState.viewState
-    ));
+    frameState.viewState = /** @type {import("../View.js").State} */ (
+      assign({}, frameState.viewState)
+    );
 
     const center = getCenter(extent);
 

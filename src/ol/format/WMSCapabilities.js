@@ -17,7 +17,7 @@ import {
   readNonNegativeIntegerString,
   readString,
 } from './xsd.js';
-import {readHref} from './XLink.js';
+import {readHref} from './xlink.js';
 
 /**
  * @const
@@ -422,9 +422,9 @@ function readCapabilityLayer(node, objectStack) {
  * @return {Object|undefined} Layer object.
  */
 function readLayer(node, objectStack) {
-  const parentLayerObject = /**  @type {!Object<string,*>} */ (objectStack[
-    objectStack.length - 1
-  ]);
+  const parentLayerObject = /**  @type {!Object<string,*>} */ (
+    objectStack[objectStack.length - 1]
+  );
 
   const layerObject = pushParseAndPop({}, LAYER_PARSERS, node, objectStack);
 

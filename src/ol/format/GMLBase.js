@@ -93,7 +93,7 @@ const ONLY_WHITESPACE_RE = /^[\s\xa0]*$/;
  */
 class GMLBase extends XMLFeature {
   /**
-   * @param {Options=} opt_options Optional configuration object.
+   * @param {Options} [opt_options] Optional configuration object.
    */
   constructor(opt_options) {
     super();
@@ -238,9 +238,8 @@ class GMLBase extends XMLFeature {
   readGeometryElement(node, objectStack) {
     const context = /** @type {Object} */ (objectStack[0]);
     context['srsName'] = node.firstElementChild.getAttribute('srsName');
-    context['srsDimension'] = node.firstElementChild.getAttribute(
-      'srsDimension'
-    );
+    context['srsDimension'] =
+      node.firstElementChild.getAttribute('srsDimension');
     const geometry = pushParseAndPop(
       null,
       this.GEOMETRY_PARSERS,
@@ -532,7 +531,7 @@ class GMLBase extends XMLFeature {
 
   /**
    * @param {Element} node Node.
-   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @param {import("./Feature.js").ReadOptions} [opt_options] Options.
    * @protected
    * @return {import("../geom/Geometry.js").default|import("../extent.js").Extent} Geometry.
    */
@@ -546,7 +545,7 @@ class GMLBase extends XMLFeature {
 
   /**
    * @param {Element} node Node.
-   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @param {import("./Feature.js").ReadOptions} [opt_options] Options.
    * @return {Array<import("../Feature.js").default>} Features.
    */
   readFeaturesFromNode(node, opt_options) {

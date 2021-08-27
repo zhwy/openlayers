@@ -29,28 +29,33 @@ import {transform2D} from '../../geom/flat/transform.js';
 
 /**
  * @typedef {Object} BBox
- * @property {number} minX
- * @property {number} minY
- * @property {number} maxX
- * @property {number} maxY
- * @property {*} value
+ * @property {number} minX Minimal x.
+ * @property {number} minY Minimal y.
+ * @property {number} maxX Maximal x.
+ * @property {number} maxY Maximal y
+ * @property {*} value Value.
  */
 
 /**
  * @typedef {Object} ImageOrLabelDimensions
- * @property {number} drawImageX
- * @property {number} drawImageY
- * @property {number} drawImageW
- * @property {number} drawImageH
- * @property {number} originX
- * @property {number} originY
- * @property {Array<number>} scale
- * @property {BBox} declutterBox
- * @property {import("../../transform.js").Transform} canvasTransform
+ * @property {number} drawImageX DrawImageX.
+ * @property {number} drawImageY DrawImageY.
+ * @property {number} drawImageW DrawImageW.
+ * @property {number} drawImageH DrawImageH.
+ * @property {number} originX OriginX.
+ * @property {number} originY OriginY.
+ * @property {Array<number>} scale Scale.
+ * @property {BBox} declutterBox DeclutterBox.
+ * @property {import("../../transform.js").Transform} canvasTransform CanvasTransform.
  */
 
 /**
  * @typedef {{0: CanvasRenderingContext2D, 1: number, 2: import("../canvas.js").Label|HTMLImageElement|HTMLCanvasElement|HTMLVideoElement, 3: ImageOrLabelDimensions, 4: number, 5: Array<*>, 6: Array<*>}} ReplayImageOrLabelArgs
+ */
+
+/**
+ * @template T
+ * @typedef {function(import("../../Feature.js").FeatureLike, import("../../geom/SimpleGeometry.js").default): T} FeatureCallback
  */
 
 /**
@@ -75,15 +80,38 @@ function getDeclutterBox(replayImageOrLabelArgs) {
   return replayImageOrLabelArgs[3].declutterBox;
 }
 
+const rtlRegEx = new RegExp(
+  /* eslint-disable prettier/prettier */
+  '[' +
+    String.fromCharCode(0x00591) + '-' + String.fromCharCode(0x008ff) +
+    String.fromCharCode(0x0fb1d) + '-' + String.fromCharCode(0x0fdff) +
+    String.fromCharCode(0x0fe70) + '-' + String.fromCharCode(0x0fefc) +
+    String.fromCharCode(0x10800) + '-' + String.fromCharCode(0x10fff) +
+    String.fromCharCode(0x1e800) + '-' + String.fromCharCode(0x1efff) +
+  ']'
+  /* eslint-enable prettier/prettier */
+);
+
+/**
+ * @param {string} text Text.
+ * @param {string} align Alignment.
+ * @return {number} Text alignment.
+ */
+function horizontalTextAlign(text, align) {
+  if ((align === 'start' || align === 'end') && !rtlRegEx.test(text)) {
+    align = align === 'start' ? 'left' : 'right';
+  }
+  return TEXT_ALIGN[align];
+}
+
 class Executor {
   /**
    * @param {number} resolution Resolution.
    * @param {number} pixelRatio Pixel ratio.
    * @param {boolean} overlaps The replay can have overlapping geometries.
    * @param {import("../canvas.js").SerializableInstructions} instructions The serializable instructions
-   * @param {import("../../size.js").Size} renderBuffer Render buffer (width/height) in pixels.
    */
-  constructor(resolution, pixelRatio, overlaps, instructions, renderBuffer) {
+  constructor(resolution, pixelRatio, overlaps, instructions) {
     /**
      * @protected
      * @type {boolean}
@@ -126,12 +154,6 @@ class Executor {
      * @type {!Object<number,import("../../coordinate.js").Coordinate|Array<import("../../coordinate.js").Coordinate>|Array<Array<import("../../coordinate.js").Coordinate>>>}
      */
     this.coordinateCache_ = {};
-
-    /**
-     * @private
-     * @type {import("../../size.js").Size}
-     */
-    this.renderBuffer_ = renderBuffer;
 
     /**
      * @private
@@ -205,7 +227,10 @@ class Executor {
       textState.scale[0] * pixelRatio,
       textState.scale[1] * pixelRatio,
     ];
-    const align = TEXT_ALIGN[textState.textAlign || defaultTextAlign];
+    const align = horizontalTextAlign(
+      text,
+      textState.textAlign || defaultTextAlign
+    );
     const strokeWidth =
       strokeKey && strokeState.lineWidth ? strokeState.lineWidth : 0;
 
@@ -513,9 +538,8 @@ class Executor {
    * @param {Array<*>} instruction Instruction.
    */
   setStrokeStyle_(context, instruction) {
-    context[
-      'strokeStyle'
-    ] = /** @type {import("../../colorlike.js").ColorLike} */ (instruction[1]);
+    context['strokeStyle'] =
+      /** @type {import("../../colorlike.js").ColorLike} */ (instruction[1]);
     context.lineWidth = /** @type {number} */ (instruction[2]);
     context.lineCap = /** @type {CanvasLineCap} */ (instruction[3]);
     context.lineJoin = /** @type {CanvasLineJoin} */ (instruction[4]);
@@ -541,7 +565,10 @@ class Executor {
 
     const strokeState = this.strokeStates[strokeKey];
     const pixelRatio = this.pixelRatio;
-    const align = TEXT_ALIGN[textState.textAlign || defaultTextAlign];
+    const align = horizontalTextAlign(
+      text,
+      textState.textAlign || defaultTextAlign
+    );
     const baseline = TEXT_ALIGN[textState.textBaseline || defaultTextBaseline];
     const strokeWidth =
       strokeState && strokeState.lineWidth ? strokeState.lineWidth : 0;
@@ -567,10 +594,10 @@ class Executor {
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {Array<*>} instructions Instructions array.
    * @param {boolean} snapToPixel Snap point symbols and text to integer pixels.
-   * @param {function(import("../../Feature.js").FeatureLike): T|undefined} featureCallback Feature callback.
-   * @param {import("../../extent.js").Extent=} opt_hitExtent Only check features that intersect this
-   *     extent.
-   * @param {import("rbush").default=} opt_declutterTree Declutter tree.
+   * @param {FeatureCallback<T>} [opt_featureCallback] Feature callback.
+   * @param {import("../../extent.js").Extent} [opt_hitExtent] Only check
+   *     features that intersect this extent.
+   * @param {import("rbush").default} [opt_declutterTree] Declutter tree.
    * @return {T|undefined} Callback result.
    * @template T
    */
@@ -580,7 +607,7 @@ class Executor {
     transform,
     instructions,
     snapToPixel,
-    featureCallback,
+    opt_featureCallback,
     opt_hitExtent,
     opt_declutterTree
   ) {
@@ -638,18 +665,23 @@ class Executor {
     const batchSize =
       this.instructions != instructions || this.overlaps ? 0 : 200;
     let /** @type {import("../../Feature.js").FeatureLike} */ feature;
-    let x, y;
+    let x, y, currentGeometry;
     while (i < ii) {
       const instruction = instructions[i];
-      const type = /** @type {import("./Instruction.js").default} */ (instruction[0]);
+      const type = /** @type {import("./Instruction.js").default} */ (
+        instruction[0]
+      );
       switch (type) {
         case CanvasInstruction.BEGIN_GEOMETRY:
-          feature = /** @type {import("../../Feature.js").FeatureLike} */ (instruction[1]);
+          feature = /** @type {import("../../Feature.js").FeatureLike} */ (
+            instruction[1]
+          );
+          currentGeometry = instruction[3];
           if (!feature.getGeometry()) {
             i = /** @type {number} */ (instruction[2]);
           } else if (
             opt_hitExtent !== undefined &&
-            !intersects(opt_hitExtent, instruction[3])
+            !intersects(opt_hitExtent, currentGeometry.getExtent())
           ) {
             i = /** @type {number} */ (instruction[2]) + 1;
           } else {
@@ -692,7 +724,10 @@ class Executor {
         case CanvasInstruction.CUSTOM:
           d = /** @type {number} */ (instruction[1]);
           dd = instruction[2];
-          const geometry = /** @type {import("../../geom/SimpleGeometry.js").default} */ (instruction[3]);
+          const geometry =
+            /** @type {import("../../geom/SimpleGeometry.js").default} */ (
+              instruction[3]
+            );
           const renderer = instruction[4];
           const fn = instruction.length == 6 ? instruction[5] : undefined;
           state.geometry = geometry;
@@ -714,7 +749,10 @@ class Executor {
         case CanvasInstruction.DRAW_IMAGE:
           d = /** @type {number} */ (instruction[1]);
           dd = /** @type {number} */ (instruction[2]);
-          image = /** @type {HTMLCanvasElement|HTMLVideoElement|HTMLImageElement} */ (instruction[3]);
+          image =
+            /** @type {HTMLCanvasElement|HTMLVideoElement|HTMLImageElement} */ (
+              instruction[3]
+            );
 
           // Remaining arguments in DRAW_IMAGE are in alphabetical order
           anchorX = /** @type {number} */ (instruction[4]);
@@ -725,9 +763,14 @@ class Executor {
           const originY = /** @type {number} */ (instruction[9]);
           const rotateWithView = /** @type {boolean} */ (instruction[10]);
           let rotation = /** @type {number} */ (instruction[11]);
-          const scale = /** @type {import("../../size.js").Size} */ (instruction[12]);
+          const scale = /** @type {import("../../size.js").Size} */ (
+            instruction[12]
+          );
           let width = /** @type {number} */ (instruction[13]);
-          const declutterImageWithText = /** @type {import("../canvas.js").DeclutterImageWithText} */ (instruction[14]);
+          const declutterImageWithText =
+            /** @type {import("../canvas.js").DeclutterImageWithText} */ (
+              instruction[14]
+            );
 
           if (!image && instruction.length >= 19) {
             // create label images
@@ -821,14 +864,15 @@ class Executor {
             let imageArgs;
             let imageDeclutterBox;
             if (opt_declutterTree && declutterImageWithText) {
-              if (!declutterImageWithText[d]) {
+              const index = dd - d;
+              if (!declutterImageWithText[index]) {
                 // We now have the image for an image+text combination.
-                declutterImageWithText[d] = args;
+                declutterImageWithText[index] = args;
                 // Don't render anything for now, wait for the text.
                 continue;
               }
-              imageArgs = declutterImageWithText[d];
-              delete declutterImageWithText[d];
+              imageArgs = declutterImageWithText[index];
+              delete declutterImageWithText[index];
               imageDeclutterBox = getDeclutterBox(imageArgs);
               if (opt_declutterTree.collides(imageDeclutterBox)) {
                 continue;
@@ -918,7 +962,9 @@ class Executor {
                   part = parts[c]; // x, y, anchorX, rotation, chunk
                   chars = /** @type {string} */ (part[4]);
                   label = this.createLabel(chars, textKey, '', strokeKey);
-                  anchorX = /** @type {number} */ (part[2]) + strokeWidth;
+                  anchorX =
+                    /** @type {number} */ (part[2]) +
+                    (textScale[0] < 0 ? -strokeWidth : strokeWidth);
                   anchorY =
                     baseline * label.height +
                     ((0.5 - baseline) * 2 * strokeWidth * textScale[1]) /
@@ -1014,9 +1060,11 @@ class Executor {
           ++i;
           break;
         case CanvasInstruction.END_GEOMETRY:
-          if (featureCallback !== undefined) {
-            feature = /** @type {import("../../Feature.js").FeatureLike} */ (instruction[1]);
-            const result = featureCallback(feature);
+          if (opt_featureCallback !== undefined) {
+            feature = /** @type {import("../../Feature.js").FeatureLike} */ (
+              instruction[1]
+            );
+            const result = opt_featureCallback(feature, currentGeometry);
             if (result) {
               return result;
             }
@@ -1069,7 +1117,10 @@ class Executor {
             }
           }
 
-          context.fillStyle = /** @type {import("../../colorlike.js").ColorLike} */ (instruction[1]);
+          context.fillStyle =
+            /** @type {import("../../colorlike.js").ColorLike} */ (
+              instruction[1]
+            );
           ++i;
           break;
         case CanvasInstruction.SET_STROKE_STYLE:
@@ -1109,7 +1160,7 @@ class Executor {
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {number} viewRotation View rotation.
    * @param {boolean} snapToPixel Snap point symbols and text to integer pixels.
-   * @param {import("rbush").default=} opt_declutterTree Declutter tree.
+   * @param {import("rbush").default} [opt_declutterTree] Declutter tree.
    */
   execute(
     context,
@@ -1136,10 +1187,9 @@ class Executor {
    * @param {CanvasRenderingContext2D} context Context.
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {number} viewRotation View rotation.
-   * @param {function(import("../../Feature.js").FeatureLike): T=} opt_featureCallback
-   *     Feature callback.
-   * @param {import("../../extent.js").Extent=} opt_hitExtent Only check features that intersect this
-   *     extent.
+   * @param {FeatureCallback<T>} [opt_featureCallback] Feature callback.
+   * @param {import("../../extent.js").Extent} [opt_hitExtent] Only check
+   *     features that intersect this extent.
    * @return {T|undefined} Callback result.
    * @template T
    */

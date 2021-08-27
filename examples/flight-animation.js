@@ -34,7 +34,7 @@ const flightsSource = new VectorSource({
   wrapX: false,
   attributions:
     'Flight data by ' +
-    '<a href="http://openflights.org/data.html">OpenFlights</a>,',
+    '<a href="https://openflights.org/data.html">OpenFlights</a>,',
   loader: function () {
     const url = 'data/openflights/flights.json';
     fetch(url)
@@ -120,7 +120,7 @@ function animateFlights(event) {
 
 function addLater(feature, timeout) {
   window.setTimeout(function () {
-    feature.set('start', new Date().getTime());
+    feature.set('start', Date.now());
     flightsSource.addFeature(feature);
   }, timeout);
 }

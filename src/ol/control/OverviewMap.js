@@ -20,7 +20,6 @@ import {
   getTopLeft,
   scaleFromCenter,
 } from '../extent.js';
-import {getChangeEventType} from '../Object.js';
 import {listen, listenOnce} from '../events.js';
 import {fromExtent as polygonFromExtent} from '../geom/Polygon.js';
 import {replaceNode} from '../dom.js';
@@ -74,7 +73,7 @@ class ControlledMap extends PluggableMap {
  */
 class OverviewMap extends Control {
   /**
-   * @param {Options=} opt_options OverviewMap options.
+   * @param {Options} [opt_options] OverviewMap options.
    */
   constructor(opt_options) {
     const options = opt_options ? opt_options : {};
@@ -306,6 +305,10 @@ class OverviewMap extends Control {
           this.resetExtent_();
         }
       }
+
+      if (!this.ovmap_.isRendered()) {
+        this.updateBoxAfterOvmapIsRendered_();
+      }
     }
   }
 
@@ -316,12 +319,19 @@ class OverviewMap extends Control {
    */
   handleMapPropertyChange_(event) {
     if (event.key === MapProperty.VIEW) {
-      const oldView = /** @type {import("../View.js").default} */ (event.oldValue);
+      const oldView = /** @type {import("../View.js").default} */ (
+        event.oldValue
+      );
       if (oldView) {
         this.unbindView_(oldView);
       }
       const newView = this.getMap().getView();
       this.bindView_(newView);
+    } else if (
+      !this.ovmap_.isRendered() &&
+      (event.key === MapProperty.TARGET || event.key === MapProperty.SIZE)
+    ) {
+      this.ovmap_.updateSize();
     }
   }
 
@@ -339,8 +349,8 @@ class OverviewMap extends Control {
       this.ovmap_.setView(newView);
     }
 
-    view.addEventListener(
-      getChangeEventType(ViewProperty.ROTATION),
+    view.addChangeListener(
+      ViewProperty.ROTATION,
       this.boundHandleRotationChanged_
     );
     // Sync once with the new view
@@ -353,8 +363,8 @@ class OverviewMap extends Control {
    * @private
    */
   unbindView_(view) {
-    view.removeEventListener(
-      getChangeEventType(ViewProperty.ROTATION),
+    view.removeChangeListener(
+      ViewProperty.ROTATION,
       this.boundHandleRotationChanged_
     );
   }
@@ -399,7 +409,9 @@ class OverviewMap extends Control {
     }
     this.viewExtent_ = extent;
 
-    const ovmapSize = /** @type {import("../size.js").Size} */ (ovmap.getSize());
+    const ovmapSize = /** @type {import("../size.js").Size} */ (
+      ovmap.getSize()
+    );
 
     const ovview = ovmap.getView();
     const ovextent = ovview.calculateExtentInternal(ovmapSize);
@@ -515,6 +527,24 @@ class OverviewMap extends Control {
   }
 
   /**
+   * @private
+   */
+  updateBoxAfterOvmapIsRendered_() {
+    if (this.ovmapPostrenderKey_) {
+      return;
+    }
+    this.ovmapPostrenderKey_ = listenOnce(
+      this.ovmap_,
+      MapEventType.POSTRENDER,
+      function (event) {
+        delete this.ovmapPostrenderKey_;
+        this.updateBox_();
+      },
+      this
+    );
+  }
+
+  /**
    * @param {MouseEvent} event The event to handle
    * @private
    */
@@ -546,14 +576,7 @@ class OverviewMap extends Control {
       }
       ovmap.updateSize();
       this.resetExtent_();
-      listenOnce(
-        ovmap,
-        MapEventType.POSTRENDER,
-        function (event) {
-          this.updateBox_();
-        },
-        this
-      );
+      this.updateBoxAfterOvmapIsRendered_();
     }
   }
 

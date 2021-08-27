@@ -147,7 +147,7 @@ import {assert} from '../asserts.js';
  */
 class Style {
   /**
-   * @param {Options=} opt_options Style options.
+   * @param {Options} [opt_options] Style options.
    */
   constructor(opt_options) {
     const options = opt_options || {};
@@ -213,12 +213,15 @@ class Style {
   clone() {
     let geometry = this.getGeometry();
     if (geometry && typeof geometry === 'object') {
-      geometry = /** @type {import("../geom/Geometry.js").default} */ (geometry).clone();
+      geometry = /** @type {import("../geom/Geometry.js").default} */ (
+        geometry
+      ).clone();
     }
     return new Style({
       geometry: geometry,
       fill: this.getFill() ? this.getFill().clone() : undefined,
       image: this.getImage() ? this.getImage().clone() : undefined,
+      renderer: this.getRenderer(),
       stroke: this.getStroke() ? this.getStroke().clone() : undefined,
       text: this.getText() ? this.getText().clone() : undefined,
       zIndex: this.getZIndex(),
@@ -360,9 +363,9 @@ class Style {
       this.geometryFunction_ = geometry;
     } else if (typeof geometry === 'string') {
       this.geometryFunction_ = function (feature) {
-        return /** @type {import("../geom/Geometry.js").default} */ (feature.get(
-          geometry
-        ));
+        return /** @type {import("../geom/Geometry.js").default} */ (
+          feature.get(geometry)
+        );
       };
     } else if (!geometry) {
       this.geometryFunction_ = defaultGeometryFunction;

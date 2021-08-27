@@ -54,7 +54,7 @@ import {listen, unlistenByKey} from '../../events.js';
  * @property {string} fragmentShader Fragment shader source, mandatory.
  * @property {string} [hitVertexShader] Vertex shader source for hit detection rendering.
  * @property {string} [hitFragmentShader] Fragment shader source for hit detection rendering.
- * @property {Object.<string,import("../../webgl/Helper").UniformValue>} [uniforms] Uniform definitions for the post process steps
+ * @property {Object<string,import("../../webgl/Helper").UniformValue>} [uniforms] Uniform definitions for the post process steps
  * Please note that `u_texture` is reserved for the main texture slot.
  * @property {Array<import("./Layer").PostProcessesOptions>} [postProcesses] Post-processes definitions
  */
@@ -526,7 +526,9 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
     let hitColor;
     for (const featureUid in this.featureCache_) {
       featureCache = this.featureCache_[featureUid];
-      geometry = /** @type {import("../../geom").Point} */ (featureCache.geometry);
+      geometry = /** @type {import("../../geom").Point} */ (
+        featureCache.geometry
+      );
       if (!geometry || geometry.getType() !== GeometryType.POINT) {
         continue;
       }
@@ -597,14 +599,21 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
    * @param {import("../../coordinate.js").Coordinate} coordinate Coordinate.
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
    * @param {number} hitTolerance Hit tolerance in pixels.
-   * @param {function(import("../../Feature.js").FeatureLike, import("../../layer/Layer.js").default): T} callback Feature callback.
-   * @return {T|void} Callback result.
+   * @param {import("../vector.js").FeatureCallback<T>} callback Feature callback.
+   * @param {Array<import("../Map.js").HitMatch<T>>} matches The hit detected matches with tolerance.
+   * @return {T|undefined} Callback result.
    * @template T
    */
-  forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback) {
+  forEachFeatureAtCoordinate(
+    coordinate,
+    frameState,
+    hitTolerance,
+    callback,
+    matches
+  ) {
     assert(this.hitDetectionEnabled_, 66);
     if (!this.hitRenderInstructions_) {
-      return;
+      return undefined;
     }
 
     const pixel = applyTransform(
@@ -621,8 +630,9 @@ class WebGLPointsLayerRenderer extends WebGLLayerRenderer {
     const source = this.getLayer().getSource();
     const feature = source.getFeatureByUid(uid);
     if (feature) {
-      return callback(feature, this.getLayer());
+      return callback(feature, this.getLayer(), null);
     }
+    return undefined;
   }
 
   /**

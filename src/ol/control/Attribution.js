@@ -46,7 +46,7 @@ import {removeChildren, replaceNode} from '../dom.js';
  */
 class Attribution extends Control {
   /**
-   * @param {Options=} opt_options Attribution options.
+   * @param {Options} [opt_options] Attribution options.
    */
   constructor(opt_options) {
     const options = opt_options ? opt_options : {};
@@ -140,12 +140,18 @@ class Attribution extends Control {
 
     const activeLabel =
       this.collapsible_ && !this.collapsed_ ? this.collapseLabel_ : this.label_;
-    const button = document.createElement('button');
-    button.setAttribute('type', 'button');
-    button.title = tipLabel;
-    button.appendChild(activeLabel);
 
-    button.addEventListener(
+    /**
+     * @private
+     * @type {HTMLElement}
+     */
+    this.toggleButton_ = document.createElement('button');
+    this.toggleButton_.setAttribute('type', 'button');
+    this.toggleButton_.setAttribute('aria-expanded', String(!this.collapsed_));
+    this.toggleButton_.title = tipLabel;
+    this.toggleButton_.appendChild(activeLabel);
+
+    this.toggleButton_.addEventListener(
       EventType.CLICK,
       this.handleClick_.bind(this),
       false
@@ -161,8 +167,8 @@ class Attribution extends Control {
       (this.collapsible_ ? '' : ' ol-uncollapsible');
     const element = this.element;
     element.className = cssClasses;
+    element.appendChild(this.toggleButton_);
     element.appendChild(this.ulElement_);
-    element.appendChild(button);
 
     /**
      * A list of currently rendered resolutions.
@@ -205,7 +211,9 @@ class Attribution extends Control {
         continue;
       }
 
-      const source = /** @type {import("../layer/Layer.js").default} */ (layerState.layer).getSource();
+      const source = /** @type {import("../layer/Layer.js").default} */ (
+        layerState.layer
+      ).getSource();
       if (!source) {
         continue;
       }
@@ -301,6 +309,7 @@ class Attribution extends Control {
       replaceNode(this.label_, this.collapseLabel_);
     }
     this.collapsed_ = !this.collapsed_;
+    this.toggleButton_.setAttribute('aria-expanded', String(!this.collapsed_));
   }
 
   /**

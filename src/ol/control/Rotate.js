@@ -33,7 +33,7 @@ import {easeOut} from '../easing.js';
  */
 class Rotate extends Control {
   /**
-   * @param {Options=} opt_options Rotate options.
+   * @param {Options} [opt_options] Rotate options.
    */
   constructor(opt_options) {
     const options = opt_options ? opt_options : {};
@@ -52,7 +52,7 @@ class Rotate extends Control {
     const compassClassName =
       options.compassClassName !== undefined
         ? options.compassClassName
-        : 'ol-comapss';
+        : 'ol-compass';
 
     /**
      * @type {HTMLElement}
