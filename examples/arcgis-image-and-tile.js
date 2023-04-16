@@ -6,7 +6,7 @@ import { fromLonLat, Projection, transform } from "../src/ol/proj.js";
 import TileGrid from "../src/ol/tilegrid/TileGrid.js";
 import { FullScreen, defaults as defaultControls } from 'ol/control';
 // import proj4 from "proj4";
-import { register } from "../src/ol/proj/proj4";
+import { register } from "../src/ol/proj/proj4.js";
 
 proj4.defs("EPSG:2385", "+proj=tmerc +lat_0=31.25 +lon_0=121.5 +k=1 +x_0=0 +y_0=0 +a=6378140 +b=6356755.288157528 +units=m +no_defs");
 register(proj4)

@@ -19,6 +19,8 @@ import { defaultResolutions } from "ol-mapbox-style/dist/util.js";
 //   map.addControl(new FullScreen());
 // });
 
+const defaultResolutions = [];
+
 const maxResolution = 360 / 512;
 defaultResolutions.length = 14;
 for (let i = 0; i < 14; ++i) {
