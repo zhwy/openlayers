@@ -7,7 +7,6 @@ import ImageSource, {defaultImageLoadFunction} from './Image.js';
 import ImageWrapper from '../Image.js';
 import {appendParams} from '../uri.js';
 import {assert} from '../asserts.js';
-import {assign} from '../obj.js';
 import {containsExtent, getHeight, getWidth} from '../extent.js';
 
 /**
@@ -20,7 +19,8 @@ import {containsExtent, getHeight, getWidth} from '../extent.js';
  * the remote server.
  * @property {import("../Image.js").LoadFunction} [imageLoadFunction] Optional function to load an image given
  * a URL.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
  * @property {Object<string,*>} [params] ArcGIS Rest parameters. This field is optional. Service
  * defaults will be used for any fields not specified. `FORMAT` is `PNG32` by default. `F` is
  * `IMAGE` by default. `TRANSPARENT` is `true` by default.  `BBOX`, `SIZE`, `BBOXSR`, and `IMAGESR`
@@ -45,21 +45,21 @@ import {containsExtent, getHeight, getWidth} from '../extent.js';
  *
  * If underlying map service is not using labels,
  * take advantage of ol image caching and use
- * {@link module:ol/source/TileArcGISRest} data source.
+ * {@link module:ol/source/TileArcGISRest~TileArcGISRest} data source.
  *
  * @fires module:ol/source/Image.ImageSourceEvent
  * @api
  */
 class ImageArcGISRest extends ImageSource {
   /**
-   * @param {Options} [opt_options] Image ArcGIS Rest Options.
+   * @param {Options} [options] Image ArcGIS Rest Options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     super({
       attributions: options.attributions,
-      imageSmoothing: options.imageSmoothing,
+      interpolate: options.interpolate,
       projection: options.projection,
       resolutions: options.resolutions,
     });
@@ -164,7 +164,7 @@ class ImageArcGISRest extends ImageSource {
       'FORMAT': 'PNG32',
       'TRANSPARENT': true,
     };
-    assign(params, this.params_);
+    Object.assign(params, this.params_);
 
     extent = extent.slice();
     const centerX = (extent[0] + extent[2]) / 2;
@@ -303,7 +303,7 @@ class ImageArcGISRest extends ImageSource {
    * @api
    */
   updateParams(params) {
-    assign(this.params_, params);
+    Object.assign(this.params_, params);
     this.image_ = null;
     this.changed();
   }

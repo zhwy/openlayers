@@ -37,10 +37,7 @@ describe('ol.control.ScaleLine', function () {
       it('defaults to "ol-scale-line"', function () {
         const ctrl = new ScaleLine();
         ctrl.setMap(map);
-        const element = document.querySelector(
-          '.ol-scale-line',
-          map.getTarget()
-        );
+        const element = document.querySelector('.ol-scale-line');
         expect(element).to.not.be(null);
         expect(element).to.be.a(HTMLDivElement);
       });
@@ -51,16 +48,10 @@ describe('ol.control.ScaleLine', function () {
         ctrl.setMap(map);
 
         // check that the default was not chosen
-        const element1 = document.querySelector(
-          '.ol-scale-line',
-          map.getTarget()
-        );
+        const element1 = document.querySelector('.ol-scale-line');
         expect(element1).to.be(null);
         // check if the configured classname was chosen
-        const element2 = document.querySelector(
-          '.humpty-dumpty',
-          map.getTarget()
-        );
+        const element2 = document.querySelector('.humpty-dumpty');
         expect(element2).to.not.be(null);
         expect(element2).to.be.a(HTMLDivElement);
       });
@@ -76,6 +67,19 @@ describe('ol.control.ScaleLine', function () {
           minWidth: 4711,
         });
         expect(ctrl.minWidth_).to.be(4711);
+      });
+    });
+
+    describe('maxWidth', function () {
+      it('defaults to undefined', function () {
+        const ctrl = new ScaleLine();
+        expect(ctrl.maxWidth_).to.be(undefined);
+      });
+      it('can be configured', function () {
+        const ctrl = new ScaleLine({
+          maxWidth: 4711,
+        });
+        expect(ctrl.maxWidth_).to.be(4711);
       });
     });
 
@@ -208,7 +212,7 @@ describe('ol.control.ScaleLine', function () {
 
       ctrl.setUnits('nautical');
       map.renderSync();
-      expect(ctrl.element.innerText).to.be('10000 nm');
+      expect(ctrl.element.innerText).to.be('10000 NM');
     });
   });
 
@@ -325,6 +329,21 @@ describe('ol.control.ScaleLine', function () {
       expect(ctrl.element.innerText).to.be('100 km');
     });
 
+    it('maxWidth is applied correctly', function () {
+      const ctrl = new ScaleLine({maxWidth: 50});
+      ctrl.setMap(map);
+      map.setView(
+        new View({
+          center: fromLonLat([-85.685, 39.891], 'Indiana-East'),
+          zoom: 7,
+          projection: 'Indiana-East',
+        })
+      );
+      map.renderSync();
+      // without maxWidth set this would be 100 km
+      expect(ctrl.element.innerText).to.be('50 km');
+    });
+
     it('shows the same scale for different projections at higher resolutions', function () {
       const ctrl = new ScaleLine();
       ctrl.setMap(map);
@@ -383,7 +402,7 @@ describe('ol.control.ScaleLine', function () {
       expect(ctrl.element.innerText).to.be('500 ft');
 
       ctrl.setUnits('nautical');
-      expect(ctrl.element.innerText).to.be('0.05 nm');
+      expect(ctrl.element.innerText).to.be('0.05 NM');
 
       ctrl.setUnits('us');
       expect(ctrl.element.innerText).to.be('500 ft');
@@ -412,7 +431,7 @@ describe('ol.control.ScaleLine', function () {
       expect(ctrl.element.innerText).to.be('5 in');
 
       ctrl.setUnits('nautical');
-      expect(ctrl.element.innerText).to.be('0.00005 nm');
+      expect(ctrl.element.innerText).to.be('0.00005 NM');
 
       ctrl.setUnits('us');
       expect(ctrl.element.innerText).to.be('5 in');
@@ -491,9 +510,8 @@ describe('ol.control.ScaleLine', function () {
         return 'mm';
       } else if (zoom > 10) {
         return 'm';
-      } else {
-        return 'km';
       }
+      return 'km';
     };
 
     const getImperialUnit = function (zoom) {
@@ -501,9 +519,8 @@ describe('ol.control.ScaleLine', function () {
         return 'in';
       } else if (zoom >= 10) {
         return 'ft';
-      } else {
-        return 'mi';
       }
+      return 'mi';
     };
 
     beforeEach(function () {
@@ -612,7 +629,7 @@ describe('ol.control.ScaleLine', function () {
         })
       );
       map.renderSync();
-      const element = document.querySelector('.ol-scale-text', map.getTarget());
+      const element = document.querySelector('.ol-scale-text');
       expect(element).to.not.be(null);
       expect(element).to.be.a(HTMLDivElement);
       const text = element.innerText;
@@ -633,12 +650,56 @@ describe('ol.control.ScaleLine', function () {
         })
       );
       map.renderSync();
-      const element = document.querySelector('.ol-scale-text', map.getTarget());
+      const element = document.querySelector('.ol-scale-text');
       expect(element).to.not.be(null);
       expect(element).to.be.a(HTMLDivElement);
       const text = element.innerText;
       expect(text.slice(0, 4)).to.be('1 : ');
       expect(text.replace(/^1|\D/g, '')).to.eql(69885283);
+    });
+    it('it corresponds to the resolution in EPSG:4326', function () {
+      const ctrl = new ScaleLine({
+        bar: true,
+        text: true,
+      });
+      ctrl.setMap(map);
+      map.setView(
+        new View({
+          center: [0, 0],
+          zoom: 2,
+          multiWorld: true,
+          projection: 'EPSG:4326',
+        })
+      );
+      map.renderSync();
+      const element = document.querySelector('.ol-scale-text');
+      expect(element).to.not.be(null);
+      expect(element).to.be.a(HTMLDivElement);
+      const text = element.innerText;
+      expect(text.slice(0, 4)).to.be('1 : ');
+      expect(text.replace(/^1|\D/g, '')).to.eql(139614359);
+    });
+    it('it changes with latitude in EPSG:4326', function () {
+      const ctrl = new ScaleLine({
+        bar: true,
+        text: true,
+      });
+      ctrl.setMap(map);
+      map.setView(
+        new View({
+          center: [0, 60],
+          zoom: 2,
+          multiWorld: true,
+          projection: 'EPSG:4326',
+        })
+      );
+      map.renderSync();
+      const element = document.querySelector('.ol-scale-text');
+      expect(element).to.not.be(null);
+      expect(element).to.be.a(HTMLDivElement);
+      const text = element.innerText;
+      expect(text.slice(0, 4)).to.be('1 : ');
+      expect(text.replace(/^1|\D/g, '')).to.eql(104710728);
     });
   });
 });

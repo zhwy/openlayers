@@ -5,8 +5,6 @@ import Event from '../events/Event.js';
 import ImageState from '../ImageState.js';
 import ReprojImage from '../reproj/Image.js';
 import Source from './Source.js';
-import {ENABLE_RASTER_REPROJECTION} from '../reproj/common.js';
-import {IMAGE_SMOOTHING_DISABLED} from './common.js';
 import {abstract} from '../util.js';
 import {equals} from '../extent.js';
 import {equivalent} from '../proj.js';
@@ -76,10 +74,11 @@ export class ImageSourceEvent extends Event {
 /**
  * @typedef {Object} Options
  * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection.
  * @property {Array<number>} [resolutions] Resolutions.
- * @property {import("./State.js").default} [state] State.
+ * @property {import("./Source.js").State} [state] State.
  */
 
 /**
@@ -100,15 +99,17 @@ class ImageSource extends Source {
       attributions: options.attributions,
       projection: options.projection,
       state: options.state,
+      interpolate:
+        options.interpolate !== undefined ? options.interpolate : true,
     });
 
     /***
-     * @type {ImageSourceOnSignature<import("../Observable.js").OnReturn>}
+     * @type {ImageSourceOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {ImageSourceOnSignature<import("../Observable.js").OnReturn>}
+     * @type {ImageSourceOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -119,7 +120,7 @@ class ImageSource extends Source {
 
     /**
      * @private
-     * @type {Array<number>}
+     * @type {Array<number>|null}
      */
     this.resolutions_ =
       options.resolutions !== undefined ? options.resolutions : null;
@@ -135,27 +136,20 @@ class ImageSource extends Source {
      * @type {number}
      */
     this.reprojectedRevision_ = 0;
-
-    /**
-     * @private
-     * @type {object|undefined}
-     */
-    this.contextOptions_ =
-      options.imageSmoothing === false ? IMAGE_SMOOTHING_DISABLED : undefined;
   }
 
   /**
-   * @return {Array<number>} Resolutions.
+   * @return {Array<number>|null} Resolutions.
    */
   getResolutions() {
     return this.resolutions_;
   }
 
   /**
-   * @return {Object|undefined} Context options.
+   * @param {Array<number>|null} resolutions Resolutions.
    */
-  getContextOptions() {
-    return this.contextOptions_;
+  setResolutions(resolutions) {
+    this.resolutions_ = resolutions;
   }
 
   /**
@@ -164,9 +158,10 @@ class ImageSource extends Source {
    * @return {number} Resolution.
    */
   findNearestResolution(resolution) {
-    if (this.resolutions_) {
-      const idx = linearFindNearest(this.resolutions_, resolution, 0);
-      resolution = this.resolutions_[idx];
+    const resolutions = this.getResolutions();
+    if (resolutions) {
+      const idx = linearFindNearest(resolutions, resolution, 0);
+      resolution = resolutions[idx];
     }
     return resolution;
   }
@@ -181,7 +176,6 @@ class ImageSource extends Source {
   getImage(extent, resolution, pixelRatio, projection) {
     const sourceProjection = this.getProjection();
     if (
-      !ENABLE_RASTER_REPROJECTION ||
       !sourceProjection ||
       !projection ||
       equivalent(sourceProjection, projection)
@@ -190,40 +184,33 @@ class ImageSource extends Source {
         projection = sourceProjection;
       }
       return this.getImageInternal(extent, resolution, pixelRatio, projection);
-    } else {
-      if (this.reprojectedImage_) {
-        if (
-          this.reprojectedRevision_ == this.getRevision() &&
-          equivalent(this.reprojectedImage_.getProjection(), projection) &&
-          this.reprojectedImage_.getResolution() == resolution &&
-          equals(this.reprojectedImage_.getExtent(), extent)
-        ) {
-          return this.reprojectedImage_;
-        }
-        this.reprojectedImage_.dispose();
-        this.reprojectedImage_ = null;
-      }
-
-      this.reprojectedImage_ = new ReprojImage(
-        sourceProjection,
-        projection,
-        extent,
-        resolution,
-        pixelRatio,
-        function (extent, resolution, pixelRatio) {
-          return this.getImageInternal(
-            extent,
-            resolution,
-            pixelRatio,
-            sourceProjection
-          );
-        }.bind(this),
-        this.contextOptions_
-      );
-      this.reprojectedRevision_ = this.getRevision();
-
-      return this.reprojectedImage_;
     }
+    if (this.reprojectedImage_) {
+      if (
+        this.reprojectedRevision_ == this.getRevision() &&
+        equivalent(this.reprojectedImage_.getProjection(), projection) &&
+        this.reprojectedImage_.getResolution() == resolution &&
+        equals(this.reprojectedImage_.getExtent(), extent)
+      ) {
+        return this.reprojectedImage_;
+      }
+      this.reprojectedImage_.dispose();
+      this.reprojectedImage_ = null;
+    }
+
+    this.reprojectedImage_ = new ReprojImage(
+      sourceProjection,
+      projection,
+      extent,
+      resolution,
+      pixelRatio,
+      (extent, resolution, pixelRatio) =>
+        this.getImageInternal(extent, resolution, pixelRatio, sourceProjection),
+      this.getInterpolate()
+    );
+    this.reprojectedRevision_ = this.getRevision();
+
+    return this.reprojectedImage_;
   }
 
   /**
@@ -246,27 +233,25 @@ class ImageSource extends Source {
    */
   handleImageChange(event) {
     const image = /** @type {import("../Image.js").default} */ (event.target);
+    let type;
     switch (image.getState()) {
       case ImageState.LOADING:
         this.loading = true;
-        this.dispatchEvent(
-          new ImageSourceEvent(ImageSourceEventType.IMAGELOADSTART, image)
-        );
+        type = ImageSourceEventType.IMAGELOADSTART;
         break;
       case ImageState.LOADED:
         this.loading = false;
-        this.dispatchEvent(
-          new ImageSourceEvent(ImageSourceEventType.IMAGELOADEND, image)
-        );
+        type = ImageSourceEventType.IMAGELOADEND;
         break;
       case ImageState.ERROR:
         this.loading = false;
-        this.dispatchEvent(
-          new ImageSourceEvent(ImageSourceEventType.IMAGELOADERROR, image)
-        );
+        type = ImageSourceEventType.IMAGELOADERROR;
         break;
       default:
-      // pass
+        return;
+    }
+    if (this.hasListener(type)) {
+      this.dispatchEvent(new ImageSourceEvent(type, image));
     }
   }
 }

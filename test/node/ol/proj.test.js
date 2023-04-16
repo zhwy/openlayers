@@ -1,17 +1,20 @@
 import Projection from '../../../src/ol/proj/Projection.js';
-import Units from '../../../src/ol/proj/Units.js';
+import View from '../../../src/ol/View.js';
 import expect from '../expect.js';
 import proj4 from 'proj4';
 import {HALF_SIZE} from '../../../src/ol/proj/epsg3857.js';
 import {
   METERS_PER_UNIT,
   addCommon,
+  addCoordinateTransforms,
   clearAllProjections,
   clearUserProjection,
+  disableCoordinateWarning,
   equivalent,
   fromLonLat,
   fromUserCoordinate,
   fromUserExtent,
+  fromUserResolution,
   getPointResolution,
   get as getProjection,
   getTransform,
@@ -21,6 +24,7 @@ import {
   toLonLat,
   toUserCoordinate,
   toUserExtent,
+  toUserResolution,
   transform,
   transformExtent,
   useGeographic,
@@ -148,6 +152,36 @@ describe('ol/proj.js', function () {
       );
       const extent = fromUserExtent(user, 'EPSG:3857');
       expect(extent).to.be(user);
+    });
+  });
+
+  describe('fromUserResolution()', function () {
+    it("adjusts a resolution for the user projection's units", function () {
+      useGeographic();
+      const user = 1 / METERS_PER_UNIT.degrees;
+      const resolution = fromUserResolution(user, 'EPSG:3857');
+      expect(resolution).to.roughlyEqual(1, 1e-9);
+    });
+
+    it('returns the original if no user projection is set', function () {
+      const user = METERS_PER_UNIT.meters;
+      const resolution = fromUserResolution(user, 'EPSG:3857');
+      expect(resolution).to.eql(user);
+    });
+  });
+
+  describe('toUserResolution()', function () {
+    it("adjusts a resolution for the user projection's units", function () {
+      useGeographic();
+      const dest = 1;
+      const resolution = toUserResolution(dest, 'EPSG:3857');
+      expect(resolution).to.eql(1 / METERS_PER_UNIT.degrees);
+    });
+
+    it('returns the original if no user projection is set', function () {
+      const dest = METERS_PER_UNIT.degrees;
+      const resolution = toUserResolution(dest, 'EPSG:3857');
+      expect(resolution).to.eql(dest);
     });
   });
 
@@ -400,7 +434,7 @@ describe('ol/proj.js', function () {
     it('returns the correct point resolution for EPSG:3857 with custom units', function () {
       let pointResolution = getPointResolution(
         'EPSG:3857',
-        METERS_PER_UNIT['degrees'],
+        METERS_PER_UNIT.degrees,
         [0, 0],
         'degrees'
       );
@@ -471,7 +505,7 @@ describe('ol/proj.js', function () {
       const proj = getProjection('EPSG:4258');
       expect(proj.getCode()).to.eql('EPSG:4258');
       expect(proj.getUnits()).to.eql('degrees');
-      expect(proj.getMetersPerUnit()).to.eql(METERS_PER_UNIT[Units.DEGREES]);
+      expect(proj.getMetersPerUnit()).to.eql(METERS_PER_UNIT.degrees);
 
       delete proj4.defs['EPSG:4258'];
     });
@@ -742,6 +776,26 @@ describe('ol/proj.js', function () {
       expect(got[2]).to.be(3);
     });
 
+    it('transforms a 3d coordinate with 2-dimension transform', function () {
+      const latlon = new Projection({
+        code: 'latlon',
+      });
+      addCoordinateTransforms(
+        'EPSG:4326',
+        latlon,
+        function (coordinate) {
+          return coordinate.slice(0, 2).reverse();
+        },
+        function (coordinate) {
+          return coordinate.slice(0, 2).reverse();
+        }
+      );
+
+      const got = transform([-10, -20, 3], 'EPSG:4326', latlon);
+      expect(got).to.have.length(3);
+      expect(got).to.eql([-20, -10, 3]);
+    });
+
     it('transforms a 4d coordinate', function () {
       const got = transform([-10, -20, 3, 4], 'EPSG:4326', 'EPSG:3857');
       expect(got).to.have.length(4);
@@ -771,6 +825,47 @@ describe('ol/proj.js', function () {
       addCommon();
     });
 
+    it('works with 3d points and proj4 defs for 3d transforms', function () {
+      proj4.defs(
+        'geocent',
+        '+proj=geocent +datum=WGS84 +ellps=WGS84 +units=m +no_defs'
+      );
+      register(proj4);
+
+      const got = transform(
+        [5584000, 2844000, 3448000],
+        'geocent',
+        'EPSG:4326'
+      );
+      expect(got).to.have.length(3);
+      expect(got[0]).to.roughlyEqual(26.990304649234826, 1e-9);
+      expect(got[1]).to.roughlyEqual(28.965718227798618, 1e-9);
+      expect(got[2]).to.roughlyEqual(779337.8584198505, 1e-9);
+
+      delete proj4.defs.geocent;
+      clearAllProjections();
+      addCommon();
+    });
+
+    it('works with 3d points and proj4 defs for 3d transforms with clamped extent', function () {
+      proj4.defs(
+        'geocent',
+        '+proj=geocent +datum=WGS84 +ellps=WGS84 +units=m +no_defs'
+      );
+      register(proj4);
+
+      const got = transform([-7.56234, 38.96618, 0], 'EPSG:4326', 'geocent');
+
+      expect(got).to.have.length(3);
+      expect(got[0]).to.roughlyEqual(4922499, 1);
+      expect(got[1]).to.roughlyEqual(-653508, 1);
+      expect(got[2]).to.roughlyEqual(3989398, 1);
+
+      delete proj4.defs.geocent;
+      clearAllProjections();
+      addCommon();
+    });
+
     it('does not flip axis order', function () {
       proj4.defs('enu', '+proj=longlat');
       proj4.defs('neu', '+proj=longlat +axis=neu');
@@ -778,7 +873,6 @@ describe('ol/proj.js', function () {
 
       const got = transform([1, 2], 'neu', 'enu');
       expect(got).to.eql([1, 2]);
-
       delete proj4.defs.enu;
       delete proj4.defs.neu;
       clearAllProjections();
@@ -856,6 +950,53 @@ describe('ol/proj.js', function () {
       expect(epsg4279.getMetersPerUnit()).to.eql(
         6377563.396 * 0.01745329251994328
       );
+    });
+  });
+
+  describe('Console info about `setUserProjection`', function () {
+    let originalConsole, callCount;
+    beforeEach(function () {
+      disableCoordinateWarning(false);
+      originalConsole = console;
+      callCount = 0;
+      global.console = {
+        ...console,
+        warn: () => ++callCount,
+      };
+    });
+    afterEach(function () {
+      global.console = originalConsole;
+      clearUserProjection();
+    });
+    it('is shown once when suspicious coordinates are used', function () {
+      const view = new View({
+        center: [16, 48],
+      });
+      view.setCenter([15, 47]);
+      expect(callCount).to.be(1);
+    });
+    it('is not shown when fromLonLat() is used', function () {
+      const view = new View({
+        center: fromLonLat([16, 48]),
+      });
+      view.setCenter(fromLonLat([15, 47]));
+      expect(callCount).to.be(0);
+    });
+    it('is not shown when useGeographic() is used', function () {
+      useGeographic();
+      const view = new View({
+        center: [16, 48],
+      });
+      view.setCenter([15, 47]);
+      expect(callCount).to.be(0);
+    });
+    it('is not shown when view projection is configured', function () {
+      const view = new View({
+        projection: 'EPSG:4326',
+        center: [16, 48],
+      });
+      view.setCenter([15, 47]);
+      expect(callCount).to.be(0);
     });
   });
 });

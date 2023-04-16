@@ -1,9 +1,8 @@
 /**
  * @module ol/layer/Heatmap
  */
-import VectorLayer from './Vector.js';
+import BaseVector from './BaseVector.js';
 import WebGLPointsLayerRenderer from '../renderer/webgl/PointsLayer.js';
-import {assign} from '../obj.js';
 import {clamp} from '../math.js';
 import {createCanvasContext2D} from '../dom.js';
 
@@ -33,7 +32,7 @@ import {createCanvasContext2D} from '../dom.js';
  * @property {string|function(import("../Feature.js").default):number} [weight='weight'] The feature
  * attribute to use for the weight or a function that returns a weight from a feature. Weight values
  * should range from 0 to 1 (and values outside will be clamped to that range).
- * @property {import("../source/Vector.js").default} [source] Source.
+ * @property {import("../source/Vector.js").default<import("../geom/Point.js").default>} [source] Point source.
  * @property {Object<string, *>} [properties] Arbitrary observable properties. Can be accessed with `#get()` and `#set()`.
  */
 
@@ -61,17 +60,17 @@ const DEFAULT_GRADIENT = ['#00f', '#0ff', '#0f0', '#ff0', '#f00'];
  * options means that `title` is observable, and has get/set accessors.
  *
  * @fires import("../render/Event.js").RenderEvent
- * @extends {VectorLayer<import("../source/Vector.js").default>}
+ * @extends {BaseVector<import("../source/Vector.js").default, WebGLPointsLayerRenderer>}
  * @api
  */
-class Heatmap extends VectorLayer {
+class Heatmap extends BaseVector {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
-    const baseOptions = assign({}, options);
+    const baseOptions = Object.assign({}, options);
 
     delete baseOptions.gradient;
     delete baseOptions.radius;
@@ -174,20 +173,16 @@ class Heatmap extends VectorLayer {
     this.set(Property.RADIUS, radius);
   }
 
-  /**
-   * Create a renderer for this layer.
-   * @return {WebGLPointsLayerRenderer} A layer renderer.
-   */
   createRenderer() {
     return new WebGLPointsLayerRenderer(this, {
       className: this.getClassName(),
       attributes: [
         {
           name: 'weight',
-          callback: function (feature) {
+          callback: (feature) => {
             const weight = this.weightFunction_(feature);
             return weight !== undefined ? clamp(weight, 0, 1) : 1;
-          }.bind(this),
+          },
         },
       ],
       vertexShader: `
@@ -273,14 +268,14 @@ class Heatmap extends VectorLayer {
           gl_FragColor = v_hitColor;
         }`,
       uniforms: {
-        u_size: function () {
+        u_size: () => {
           return (this.get(Property.RADIUS) + this.get(Property.BLUR)) * 2;
-        }.bind(this),
-        u_blurSlope: function () {
+        },
+        u_blurSlope: () => {
           return (
             this.get(Property.RADIUS) / Math.max(1, this.get(Property.BLUR))
           );
-        }.bind(this),
+        },
       },
       postProcesses: [
         {
@@ -289,19 +284,23 @@ class Heatmap extends VectorLayer {
 
             uniform sampler2D u_image;
             uniform sampler2D u_gradientTexture;
+            uniform float u_opacity;
 
             varying vec2 v_texCoord;
 
             void main() {
               vec4 color = texture2D(u_image, v_texCoord);
-              gl_FragColor.a = color.a;
+              gl_FragColor.a = color.a * u_opacity;
               gl_FragColor.rgb = texture2D(u_gradientTexture, vec2(0.5, color.a)).rgb;
               gl_FragColor.rgb *= gl_FragColor.a;
             }`,
           uniforms: {
-            u_gradientTexture: function () {
+            u_gradientTexture: () => {
               return this.gradient_;
-            }.bind(this),
+            },
+            u_opacity: () => {
+              return this.getOpacity();
+            },
           },
         },
       ],

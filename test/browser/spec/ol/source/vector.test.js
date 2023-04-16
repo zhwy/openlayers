@@ -7,6 +7,7 @@ import Point from '../../../../../src/ol/geom/Point.js';
 import VectorLayer from '../../../../../src/ol/layer/Vector.js';
 import VectorSource from '../../../../../src/ol/source/Vector.js';
 import View from '../../../../../src/ol/View.js';
+import sinon from 'sinon';
 import {bbox as bboxStrategy} from '../../../../../src/ol/loadingstrategy.js';
 import {
   fromLonLat,
@@ -49,6 +50,34 @@ describe('ol.source.Vector', function () {
     describe('#isEmpty', function () {
       it('returns true', function () {
         expect(vectorSource.isEmpty()).to.be(true);
+      });
+      it('returns true without spatial index', function () {
+        const source = new VectorSource({
+          useSpatialIndex: false,
+        });
+        expect(source.isEmpty()).to.be(true);
+      });
+      it('returns false with geometry', function () {
+        vectorSource.addFeature(new Feature(new Point([0, 0])));
+        expect(vectorSource.isEmpty()).to.be(false);
+      });
+      it('returns false without spatial index and geometry', function () {
+        const source = new VectorSource({
+          useSpatialIndex: false,
+        });
+        source.addFeature(new Feature(new Point([0, 0])));
+        expect(source.isEmpty()).to.be(false);
+      });
+      it('returns false with null geometry', function () {
+        vectorSource.addFeature(new Feature());
+        expect(vectorSource.isEmpty()).to.be(false);
+      });
+      it('returns false without spatial index and null geometry', function () {
+        const source = new VectorSource({
+          useSpatialIndex: false,
+        });
+        source.addFeature(new Feature());
+        expect(source.isEmpty()).to.be(false);
       });
     });
 
@@ -338,6 +367,19 @@ describe('ol.source.Vector', function () {
         listen(vectorSource, 'removefeature', listener);
         vectorSource.removeFeature(features[0]);
         expect(listener.called).to.be(true);
+      });
+
+      it('accepts features that are not in the source', function () {
+        const changeListener = sinon.spy();
+        listen(vectorSource, 'change', changeListener);
+
+        const removeFeatureListener = sinon.spy();
+        listen(vectorSource, 'removefeature', removeFeatureListener);
+
+        const feature = new Feature(new Point([0, 0]));
+        vectorSource.removeFeature(feature);
+        expect(changeListener.called).to.be(false);
+        expect(removeFeatureListener.called).to.be(false);
       });
     });
 
@@ -936,6 +978,47 @@ describe('ol.source.Vector', function () {
       expect(source.getFeatures().length).to.be(1);
       collection.clear();
       expect(source.getFeatures().length).to.be(0);
+    });
+  });
+
+  describe('#getFeaturesInExtent()', function () {
+    it('adjusts the extent if projection canWrapX', function () {
+      const a = new Feature(new Point([0, 0]));
+      const b = new Feature(new Point([179, 0]));
+      const c = new Feature(new Point([-179, 0]));
+
+      const source = new VectorSource({
+        features: [a, b, c],
+      });
+
+      const projection = getProjection('EPSG:4326');
+
+      expect(
+        source.getFeaturesInExtent([-180, -90, 180, 90], projection).length
+      ).to.be(3);
+      const onlyB = source.getFeaturesInExtent([1, -90, 180, 90], projection);
+      expect(onlyB.length).to.be(1);
+      expect(onlyB).to.contain(b);
+      const bAndC = source.getFeaturesInExtent([1, -90, 182, 90], projection);
+      expect(bAndC.length).to.be(2);
+      expect(bAndC).to.contain(b);
+      expect(bAndC).to.contain(c);
+
+      const onlyC = source.getFeaturesInExtent([-180, -90, -1, 90], projection);
+      expect(onlyC.length).to.be(1);
+      expect(onlyC).to.contain(c);
+
+      const bAndCAgain = source.getFeaturesInExtent(
+        [-182, -90, -1, 90],
+        projection
+      );
+      expect(bAndCAgain.length).to.be(2);
+      expect(bAndCAgain).to.contain(b);
+      expect(bAndCAgain).to.contain(c);
+
+      const onlyA = source.getFeaturesInExtent([359, -90, 361, 90], projection);
+      expect(onlyA.length).to.be(1);
+      expect(onlyA).to.contain(a);
     });
   });
 });

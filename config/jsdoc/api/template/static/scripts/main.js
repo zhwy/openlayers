@@ -62,21 +62,49 @@ $(function () {
       $navList.addClass('search-empty');
       return 'search-empty';
     })();
+    let initialCurrent = navListNode.querySelector('li.item');
+    const longname = initialCurrent && initialCurrent.dataset.longname;
     let manualToggles = {};
-
-    // Show an item related a current documentation automatically
-    const longname = $('.page-title').data('filename')
-      .replace(/\.[a-z]+$/, '')
-      .replace('module-', 'module:')
-      .replace(/_/g, '/')
-      .replace(/-/g, '~');
-    const currentItem = navListNode.querySelector('.item[data-longname="' + longname + '"]');
-    if (currentItem) {
-      $navList.prepend(currentItem);
+    if (initialCurrent) {
+      manualToggles[longname] = $(initialCurrent);
     }
+
+    fetch('./navigation.tmpl.html').then(function (response) {
+      return response.text();
+    }).then(function (text) {
+      navListNode.innerHTML = text;
+
+      // Show an item related a current documentation automatically
+      const currentItem = navListNode.querySelector('.item[data-longname="' + longname + '"]');
+      if (currentItem) {
+        $navList.prepend(currentItem);
+        search.$currentItem = $(currentItem);
+      }
+      $classItems = undefined;
+      $members = undefined;
+
+      // Search again with full navigation, if user already searched
+      manualToggles = {};
+      const lastTerm = search.lastSearchTerm;
+      search.lastSearchTerm = undefined;
+      if (currentItem) {
+        const fa = currentItem.querySelector('.title > .fa');
+        fa.classList.add('no-transition');
+        setTimeout(function () {
+          fa.classList.remove('no-transition');
+        }, 0);
+      }
+      doSearch(lastTerm || '');
+
+      // Transfer manual toggle state to newly loaded current node
+      if (initialCurrent && initialCurrent.classList.contains('toggle-manual')) {
+        search.manualToggle(search.$currentItem, initialCurrent.classList.contains('toggle-manual-show'));
+      }
+    });
+
     return {
       $navList: $navList,
-      $currentItem: currentItem ? $(currentItem) : undefined,
+      $currentItem: initialCurrent ? $(initialCurrent) : undefined,
       lastSearchTerm: undefined,
       lastState: {},
       lastClasses: undefined,
@@ -240,7 +268,7 @@ $(function () {
 
   // Toggle when click an item element
   search.$navList.on('click', '.toggle', function (e) {
-    if (event.target.tagName.toLowerCase() === 'a') {
+    if (e.target.tagName === 'A') {
       return;
     }
     const clsItem = $(this).closest('.item');
@@ -249,28 +277,28 @@ $(function () {
   });
 
   // warn about outdated version
-  var currentVersion = document.getElementById('package-version').innerHTML;
-  var packageUrl = 'https://raw.githubusercontent.com/openlayers/openlayers.github.io/build/package.json';
-  fetch(packageUrl).then(function(response) {
+  const currentVersion = document.getElementById('package-version').innerHTML;
+  const releaseUrl = 'https://cdn.jsdelivr.net/npm/ol/package.json';
+  fetch(releaseUrl).then(function(response) {
     return response.json();
   }).then(function(json) {
-    var latestVersion = json.version;
+    const latestVersion = json.version;
     document.getElementById('latest-version').innerHTML = latestVersion;
-    var url = window.location.href;
-    var branchSearch = url.match(/\/([^\/]*)\/apidoc\//);
-    var cookieText = 'dismissed=-' + latestVersion + '-';
-    var dismissed = document.cookie.indexOf(cookieText) != -1;
+    const url = window.location.href;
+    const branchSearch = url.match(/\/([^\/]*)\/apidoc\//);
+    const storageKey = 'dismissed=-' + latestVersion;
+    const dismissed = localStorage.getItem(storageKey) === 'true';
     if (branchSearch && !dismissed && /^v[0-9\.]*$/.test(branchSearch[1]) && currentVersion != latestVersion) {
-      var link = url.replace(branchSearch[0], '/latest/apidoc/');
+      const link = url.replace(branchSearch[0], '/latest/apidoc/');
       fetch(link, {method: 'head'}).then(function(response) {
-        var a = document.getElementById('latest-link');
+        const a = document.getElementById('latest-link');
         a.href = response.status == 200 ? link : '../../latest/apidoc/';
       });
-      var latestCheck = document.getElementById('latest-check');
+      const latestCheck = document.getElementById('latest-check');
       latestCheck.style.display = '';
       document.getElementById('latest-dismiss').onclick = function() {
         latestCheck.style.display = 'none';
-        document.cookie = cookieText;
+        localStorage.setItem(storageKey, 'true');
       }
     }
   });

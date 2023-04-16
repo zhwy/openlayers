@@ -23,16 +23,15 @@ import {assert} from '../asserts.js';
  */
 class LRUCache {
   /**
-   * @param {number} [opt_highWaterMark] High water mark.
+   * @param {number} [highWaterMark] High water mark.
    */
-  constructor(opt_highWaterMark) {
+  constructor(highWaterMark) {
     /**
      * Desired max cache size after expireCache(). If set to 0, no cache entries
      * will be pruned at all.
      * @type {number}
      */
-    this.highWaterMark =
-      opt_highWaterMark !== undefined ? opt_highWaterMark : 2048;
+    this.highWaterMark = highWaterMark !== undefined ? highWaterMark : 2048;
 
     /**
      * @private
@@ -64,6 +63,16 @@ class LRUCache {
    */
   canExpireCache() {
     return this.highWaterMark > 0 && this.getCount() > this.highWaterMark;
+  }
+
+  /**
+   * Expire the cache.
+   * @param {!Object<string, boolean>} [keep] Keys to keep. To be implemented by subclasses.
+   */
+  expireCache(keep) {
+    while (this.canExpireCache()) {
+      this.pop();
+    }
   }
 
   /**
@@ -100,10 +109,10 @@ class LRUCache {
 
   /**
    * @param {string} key Key.
-   * @param {*} [opt_options] Options (reserved for subclasses).
+   * @param {*} [options] Options (reserved for subclasses).
    * @return {T} Value.
    */
-  get(key, opt_options) {
+  get(key, options) {
     const entry = this.entries_[key];
     assert(entry !== undefined, 15); // Tried to get a value for a key that does not exist in the cache
     if (entry === this.newest_) {
@@ -202,6 +211,18 @@ class LRUCache {
    */
   peekFirstKey() {
     return this.newest_.key_;
+  }
+
+  /**
+   * Return an entry without updating least recently used time.
+   * @param {string} key Key.
+   * @return {T} Value.
+   */
+  peek(key) {
+    if (!this.containsKey(key)) {
+      return undefined;
+    }
+    return this.entries_[key].value_;
   }
 
   /**

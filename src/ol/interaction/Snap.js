@@ -3,32 +3,28 @@
  */
 import CollectionEventType from '../CollectionEventType.js';
 import EventType from '../events/EventType.js';
-import GeometryType from '../geom/GeometryType.js';
 import PointerInteraction from './Pointer.js';
 import RBush from '../structs/RBush.js';
 import VectorEventType from '../source/VectorEventType.js';
 import {FALSE, TRUE} from '../functions.js';
-import {boundingExtent, createEmpty} from '../extent.js';
+import {boundingExtent, buffer, createEmpty} from '../extent.js';
 import {
   closestOnCircle,
   closestOnSegment,
-  distance as coordinateDistance,
-  squaredDistance as squaredCoordinateDistance,
-  squaredDistanceToSegment,
+  squaredDistance,
 } from '../coordinate.js';
 import {fromCircle} from '../geom/Polygon.js';
 import {
   fromUserCoordinate,
   getUserProjection,
   toUserCoordinate,
+  toUserExtent,
 } from '../proj.js';
 import {getUid} from '../util.js';
-import {getValues} from '../obj.js';
 import {listen, unlistenByKey} from '../events.js';
 
 /**
  * @typedef {Object} Result
- * @property {boolean} snapped Snapped.
  * @property {import("../coordinate.js").Coordinate|null} vertex Vertex.
  * @property {import("../pixel.js").Pixel|null} vertexPixel VertexPixel.
  */
@@ -50,7 +46,7 @@ import {listen, unlistenByKey} from '../events.js';
  */
 
 /**
- * @param  {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent} evt Event.
+ * @param  {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent<import("../Feature.js").default>} evt Event.
  * @return {import("../Feature.js").default} Feature.
  */
 function getFeatureFromEvent(evt) {
@@ -60,11 +56,13 @@ function getFeatureFromEvent(evt) {
     return /** @type {import("../source/Vector.js").VectorSourceEvent} */ (evt)
       .feature;
   } else if (
-    /** @type {import("../Collection.js").CollectionEvent} */ (evt).element
+    /** @type {import("../Collection.js").CollectionEvent<import("../Feature.js").default>} */ (
+      evt
+    ).element
   ) {
-    return /** @type {import("../Feature.js").default} */ (
-      /** @type {import("../Collection.js").CollectionEvent} */ (evt).element
-    );
+    return /** @type {import("../Collection.js").CollectionEvent<import("../Feature.js").default>} */ (
+      evt
+    ).element;
   }
 }
 
@@ -73,7 +71,7 @@ const tempSegment = [];
 /**
  * @classdesc
  * Handles snapping of vector features while modifying or drawing them.  The
- * features can come from a {@link module:ol/source/Vector} or {@link module:ol/Collection~Collection}
+ * features can come from a {@link module:ol/source/Vector~VectorSource} or {@link module:ol/Collection~Collection}
  * Any interaction object that allows the user to interact
  * with the features using the mouse can benefit from the snapping, as long
  * as it is added before.
@@ -83,7 +81,7 @@ const tempSegment = [];
  *
  * Example:
  *
- *     import Snap from 'ol/interaction/Snap';
+ *     import Snap from 'ol/interaction/Snap.js';
  *
  *     const snap = new Snap({
  *       source: source
@@ -95,10 +93,10 @@ const tempSegment = [];
  */
 class Snap extends PointerInteraction {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     const pointerOptions = /** @type {import("./Pointer.js").Options} */ (
       options
@@ -115,7 +113,7 @@ class Snap extends PointerInteraction {
     super(pointerOptions);
 
     /**
-     * @type {import("../source/Vector.js").default}
+     * @type {import("../source/Vector.js").default|null}
      * @private
      */
     this.source_ = options.source ? options.source : null;
@@ -133,7 +131,7 @@ class Snap extends PointerInteraction {
     this.edge_ = options.edge !== undefined ? options.edge : true;
 
     /**
-     * @type {import("../Collection.js").default<import("../Feature.js").default>}
+     * @type {import("../Collection.js").default<import("../Feature.js").default>|null}
      * @private
      */
     this.features_ = options.features ? options.features : null;
@@ -184,39 +182,54 @@ class Snap extends PointerInteraction {
     /**
      * @const
      * @private
-     * @type {Object<string, function(import("../Feature.js").default, import("../geom/Geometry.js").default): void>}
+     * @type {Object<string, function(Array<Array<import('../coordinate.js').Coordinate>>, import("../geom/Geometry.js").default): void>}
      */
-    this.SEGMENT_WRITERS_ = {
-      'Point': this.writePointGeometry_.bind(this),
-      'LineString': this.writeLineStringGeometry_.bind(this),
-      'LinearRing': this.writeLineStringGeometry_.bind(this),
-      'Polygon': this.writePolygonGeometry_.bind(this),
-      'MultiPoint': this.writeMultiPointGeometry_.bind(this),
-      'MultiLineString': this.writeMultiLineStringGeometry_.bind(this),
-      'MultiPolygon': this.writeMultiPolygonGeometry_.bind(this),
-      'GeometryCollection': this.writeGeometryCollectionGeometry_.bind(this),
-      'Circle': this.writeCircleGeometry_.bind(this),
+    this.GEOMETRY_SEGMENTERS_ = {
+      'Point': this.segmentPointGeometry_.bind(this),
+      'LineString': this.segmentLineStringGeometry_.bind(this),
+      'LinearRing': this.segmentLineStringGeometry_.bind(this),
+      'Polygon': this.segmentPolygonGeometry_.bind(this),
+      'MultiPoint': this.segmentMultiPointGeometry_.bind(this),
+      'MultiLineString': this.segmentMultiLineStringGeometry_.bind(this),
+      'MultiPolygon': this.segmentMultiPolygonGeometry_.bind(this),
+      'GeometryCollection': this.segmentGeometryCollectionGeometry_.bind(this),
+      'Circle': this.segmentCircleGeometry_.bind(this),
     };
   }
 
   /**
    * Add a feature to the collection of features that we may snap to.
    * @param {import("../Feature.js").default} feature Feature.
-   * @param {boolean} [opt_listen] Whether to listen to the feature change or not
+   * @param {boolean} [register] Whether to listen to the feature change or not
    *     Defaults to `true`.
    * @api
    */
-  addFeature(feature, opt_listen) {
-    const register = opt_listen !== undefined ? opt_listen : true;
+  addFeature(feature, register) {
+    register = register !== undefined ? register : true;
     const feature_uid = getUid(feature);
     const geometry = feature.getGeometry();
     if (geometry) {
-      const segmentWriter = this.SEGMENT_WRITERS_[geometry.getType()];
-      if (segmentWriter) {
+      const segmenter = this.GEOMETRY_SEGMENTERS_[geometry.getType()];
+      if (segmenter) {
         this.indexedFeaturesExtents_[feature_uid] = geometry.getExtent(
           createEmpty()
         );
-        segmentWriter(feature, geometry);
+        const segments =
+          /** @type {Array<Array<import('../coordinate.js').Coordinate>>} */ ([]);
+        segmenter(segments, geometry);
+        if (segments.length === 1) {
+          this.rBush_.insert(boundingExtent(segments[0]), {
+            feature: feature,
+            segment: segments[0],
+          });
+        } else if (segments.length > 1) {
+          const extents = segments.map((s) => boundingExtent(s));
+          const segmentsData = segments.map((segment) => ({
+            feature: feature,
+            segment: segment,
+          }));
+          this.rBush_.load(extents, segmentsData);
+        }
       }
     }
 
@@ -251,6 +264,7 @@ class Snap extends PointerInteraction {
    * @private
    */
   getFeatures_() {
+    /** @type {import("../Collection.js").default<import("../Feature.js").default>|Array<import("../Feature.js").default>} */
     let features;
     if (this.features_) {
       features = this.features_;
@@ -266,7 +280,7 @@ class Snap extends PointerInteraction {
    */
   handleEvent(evt) {
     const result = this.snapTo(evt.pixel, evt.coordinate, evt.map);
-    if (result.snapped) {
+    if (result) {
       evt.coordinate = result.vertex.slice(0, 2);
       evt.pixel = result.vertexPixel;
     }
@@ -274,7 +288,7 @@ class Snap extends PointerInteraction {
   }
 
   /**
-   * @param {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent} evt Event.
+   * @param {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent<import("../Feature.js").default>} evt Event.
    * @private
    */
   handleFeatureAdd_(evt) {
@@ -283,7 +297,7 @@ class Snap extends PointerInteraction {
   }
 
   /**
-   * @param {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent} evt Event.
+   * @param {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent<import("../Feature.js").default>} evt Event.
    * @private
    */
   handleFeatureRemove_(evt) {
@@ -313,7 +327,7 @@ class Snap extends PointerInteraction {
    * @return {boolean} If the event was consumed.
    */
   handleUpEvent(evt) {
-    const featuresToUpdate = getValues(this.pendingFeatures_);
+    const featuresToUpdate = Object.values(this.pendingFeatures_);
     if (featuresToUpdate.length) {
       featuresToUpdate.forEach(this.updateFeature_.bind(this));
       this.pendingFeatures_ = {};
@@ -324,12 +338,12 @@ class Snap extends PointerInteraction {
   /**
    * Remove a feature from the collection of features that we may snap to.
    * @param {import("../Feature.js").default} feature Feature
-   * @param {boolean} [opt_unlisten] Whether to unlisten to the feature change
+   * @param {boolean} [unlisten] Whether to unlisten to the feature change
    *     or not. Defaults to `true`.
    * @api
    */
-  removeFeature(feature, opt_unlisten) {
-    const unregister = opt_unlisten !== undefined ? opt_unlisten : true;
+  removeFeature(feature, unlisten) {
+    const unregister = unlisten !== undefined ? unlisten : true;
     const feature_uid = getUid(feature);
     const extent = this.indexedFeaturesExtents_[feature_uid];
     if (extent) {
@@ -355,7 +369,7 @@ class Snap extends PointerInteraction {
    * Remove the interaction from its current map and attach it to the new map.
    * Subclasses may set up event handlers to get notified about changes to
    * the map here.
-   * @param {import("../PluggableMap.js").default} map Map.
+   * @param {import("../Map.js").default} map Map.
    */
   setMap(map) {
     const currentMap = this.getMap();
@@ -410,127 +424,110 @@ class Snap extends PointerInteraction {
   /**
    * @param {import("../pixel.js").Pixel} pixel Pixel
    * @param {import("../coordinate.js").Coordinate} pixelCoordinate Coordinate
-   * @param {import("../PluggableMap.js").default} map Map.
-   * @return {Result} Snap result
+   * @param {import("../Map.js").default} map Map.
+   * @return {Result|null} Snap result
    */
   snapTo(pixel, pixelCoordinate, map) {
-    const lowerLeft = map.getCoordinateFromPixel([
-      pixel[0] - this.pixelTolerance_,
-      pixel[1] + this.pixelTolerance_,
-    ]);
-    const upperRight = map.getCoordinateFromPixel([
-      pixel[0] + this.pixelTolerance_,
-      pixel[1] - this.pixelTolerance_,
-    ]);
-    const box = boundingExtent([lowerLeft, upperRight]);
-
-    let segments = this.rBush_.getInExtent(box);
-
-    // If snapping on vertices only, don't consider circles
-    if (this.vertex_ && !this.edge_) {
-      segments = segments.filter(function (segment) {
-        return segment.feature.getGeometry().getType() !== GeometryType.CIRCLE;
-      });
-    }
-
-    let snapped = false;
-    let vertex = null;
-    let vertexPixel = null;
-
-    if (segments.length === 0) {
-      return {
-        snapped: snapped,
-        vertex: vertex,
-        vertexPixel: vertexPixel,
-      };
-    }
-
     const projection = map.getView().getProjection();
     const projectedCoordinate = fromUserCoordinate(pixelCoordinate, projection);
 
-    let closestSegmentData;
+    const box = toUserExtent(
+      buffer(
+        boundingExtent([projectedCoordinate]),
+        map.getView().getResolution() * this.pixelTolerance_
+      ),
+      projection
+    );
+
+    const segments = this.rBush_.getInExtent(box);
+
+    const segmentsLength = segments.length;
+    if (segmentsLength === 0) {
+      return null;
+    }
+
+    let closestVertex;
     let minSquaredDistance = Infinity;
-    for (let i = 0; i < segments.length; ++i) {
-      const segmentData = segments[i];
-      tempSegment[0] = fromUserCoordinate(segmentData.segment[0], projection);
-      tempSegment[1] = fromUserCoordinate(segmentData.segment[1], projection);
-      const delta = squaredDistanceToSegment(projectedCoordinate, tempSegment);
-      if (delta < minSquaredDistance) {
-        closestSegmentData = segmentData;
-        minSquaredDistance = delta;
+
+    const squaredPixelTolerance = this.pixelTolerance_ * this.pixelTolerance_;
+    const getResult = () => {
+      if (closestVertex) {
+        const vertexPixel = map.getPixelFromCoordinate(closestVertex);
+        const squaredPixelDistance = squaredDistance(pixel, vertexPixel);
+        if (squaredPixelDistance <= squaredPixelTolerance) {
+          return {
+            vertex: closestVertex,
+            vertexPixel: [
+              Math.round(vertexPixel[0]),
+              Math.round(vertexPixel[1]),
+            ],
+          };
+        }
+      }
+      return null;
+    };
+
+    if (this.vertex_) {
+      for (let i = 0; i < segmentsLength; ++i) {
+        const segmentData = segments[i];
+        if (segmentData.feature.getGeometry().getType() !== 'Circle') {
+          segmentData.segment.forEach((vertex) => {
+            const tempVertexCoord = fromUserCoordinate(vertex, projection);
+            const delta = squaredDistance(projectedCoordinate, tempVertexCoord);
+            if (delta < minSquaredDistance) {
+              closestVertex = vertex;
+              minSquaredDistance = delta;
+            }
+          });
+        }
+      }
+      const result = getResult();
+      if (result) {
+        return result;
       }
     }
-    const closestSegment = closestSegmentData.segment;
 
-    if (this.vertex_ && !this.edge_) {
-      const pixel1 = map.getPixelFromCoordinate(closestSegment[0]);
-      const pixel2 = map.getPixelFromCoordinate(closestSegment[1]);
-      const squaredDist1 = squaredCoordinateDistance(pixel, pixel1);
-      const squaredDist2 = squaredCoordinateDistance(pixel, pixel2);
-      const dist = Math.sqrt(Math.min(squaredDist1, squaredDist2));
-      if (dist <= this.pixelTolerance_) {
-        snapped = true;
-        vertex =
-          squaredDist1 > squaredDist2 ? closestSegment[1] : closestSegment[0];
-        vertexPixel = map.getPixelFromCoordinate(vertex);
-      }
-    } else if (this.edge_) {
-      const isCircle =
-        closestSegmentData.feature.getGeometry().getType() ===
-        GeometryType.CIRCLE;
-      if (isCircle) {
-        let circleGeometry = closestSegmentData.feature.getGeometry();
-        const userProjection = getUserProjection();
-        if (userProjection) {
-          circleGeometry = circleGeometry
-            .clone()
-            .transform(userProjection, projection);
-        }
-        vertex = toUserCoordinate(
-          closestOnCircle(
+    if (this.edge_) {
+      for (let i = 0; i < segmentsLength; ++i) {
+        let vertex = null;
+        const segmentData = segments[i];
+        if (segmentData.feature.getGeometry().getType() === 'Circle') {
+          let circleGeometry = segmentData.feature.getGeometry();
+          const userProjection = getUserProjection();
+          if (userProjection) {
+            circleGeometry = circleGeometry
+              .clone()
+              .transform(userProjection, projection);
+          }
+          vertex = closestOnCircle(
             projectedCoordinate,
             /** @type {import("../geom/Circle.js").default} */ (circleGeometry)
-          ),
-          projection
-        );
-      } else {
-        tempSegment[0] = fromUserCoordinate(closestSegment[0], projection);
-        tempSegment[1] = fromUserCoordinate(closestSegment[1], projection);
-        vertex = toUserCoordinate(
-          closestOnSegment(projectedCoordinate, tempSegment),
-          projection
-        );
-      }
-      vertexPixel = map.getPixelFromCoordinate(vertex);
-
-      if (coordinateDistance(pixel, vertexPixel) <= this.pixelTolerance_) {
-        snapped = true;
-        if (this.vertex_ && !isCircle) {
-          const pixel1 = map.getPixelFromCoordinate(closestSegment[0]);
-          const pixel2 = map.getPixelFromCoordinate(closestSegment[1]);
-          const squaredDist1 = squaredCoordinateDistance(vertexPixel, pixel1);
-          const squaredDist2 = squaredCoordinateDistance(vertexPixel, pixel2);
-          const dist = Math.sqrt(Math.min(squaredDist1, squaredDist2));
-          if (dist <= this.pixelTolerance_) {
-            vertex =
-              squaredDist1 > squaredDist2
-                ? closestSegment[1]
-                : closestSegment[0];
-            vertexPixel = map.getPixelFromCoordinate(vertex);
+          );
+        } else {
+          const [segmentStart, segmentEnd] = segmentData.segment;
+          // points have only one coordinate
+          if (segmentEnd) {
+            tempSegment[0] = fromUserCoordinate(segmentStart, projection);
+            tempSegment[1] = fromUserCoordinate(segmentEnd, projection);
+            vertex = closestOnSegment(projectedCoordinate, tempSegment);
+          }
+        }
+        if (vertex) {
+          const delta = squaredDistance(projectedCoordinate, vertex);
+          if (delta < minSquaredDistance) {
+            closestVertex = toUserCoordinate(vertex, projection);
+            minSquaredDistance = delta;
           }
         }
       }
+
+      const result = getResult();
+      if (result) {
+        return result;
+      }
     }
 
-    if (snapped) {
-      vertexPixel = [Math.round(vertexPixel[0]), Math.round(vertexPixel[1])];
-    }
-
-    return {
-      snapped: snapped,
-      vertex: vertex,
-      vertexPixel: vertexPixel,
-    };
+    return null;
   }
 
   /**
@@ -543,11 +540,11 @@ class Snap extends PointerInteraction {
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/Circle.js").default} geometry Geometry.
    * @private
    */
-  writeCircleGeometry_(feature, geometry) {
+  segmentCircleGeometry_(segments, geometry) {
     const projection = this.getMap().getView().getProjection();
     let circleGeometry = geometry;
     const userProjection = getUserProjection();
@@ -562,137 +559,101 @@ class Snap extends PointerInteraction {
     }
     const coordinates = polygon.getCoordinates()[0];
     for (let i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-      const segment = coordinates.slice(i, i + 2);
-      const segmentData = {
-        feature: feature,
-        segment: segment,
-      };
-      this.rBush_.insert(boundingExtent(segment), segmentData);
+      segments.push(coordinates.slice(i, i + 2));
     }
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/GeometryCollection.js").default} geometry Geometry.
    * @private
    */
-  writeGeometryCollectionGeometry_(feature, geometry) {
+  segmentGeometryCollectionGeometry_(segments, geometry) {
     const geometries = geometry.getGeometriesArray();
     for (let i = 0; i < geometries.length; ++i) {
-      const segmentWriter = this.SEGMENT_WRITERS_[geometries[i].getType()];
-      if (segmentWriter) {
-        segmentWriter(feature, geometries[i]);
+      const segmenter = this.GEOMETRY_SEGMENTERS_[geometries[i].getType()];
+      if (segmenter) {
+        segmenter(segments, geometries[i]);
       }
     }
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/LineString.js").default} geometry Geometry.
    * @private
    */
-  writeLineStringGeometry_(feature, geometry) {
+  segmentLineStringGeometry_(segments, geometry) {
     const coordinates = geometry.getCoordinates();
     for (let i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-      const segment = coordinates.slice(i, i + 2);
-      const segmentData = {
-        feature: feature,
-        segment: segment,
-      };
-      this.rBush_.insert(boundingExtent(segment), segmentData);
+      segments.push(coordinates.slice(i, i + 2));
     }
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/MultiLineString.js").default} geometry Geometry.
    * @private
    */
-  writeMultiLineStringGeometry_(feature, geometry) {
+  segmentMultiLineStringGeometry_(segments, geometry) {
     const lines = geometry.getCoordinates();
     for (let j = 0, jj = lines.length; j < jj; ++j) {
       const coordinates = lines[j];
       for (let i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-        const segment = coordinates.slice(i, i + 2);
-        const segmentData = {
-          feature: feature,
-          segment: segment,
-        };
-        this.rBush_.insert(boundingExtent(segment), segmentData);
+        segments.push(coordinates.slice(i, i + 2));
       }
     }
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/MultiPoint.js").default} geometry Geometry.
    * @private
    */
-  writeMultiPointGeometry_(feature, geometry) {
-    const points = geometry.getCoordinates();
-    for (let i = 0, ii = points.length; i < ii; ++i) {
-      const coordinates = points[i];
-      const segmentData = {
-        feature: feature,
-        segment: [coordinates, coordinates],
-      };
-      this.rBush_.insert(geometry.getExtent(), segmentData);
-    }
+  segmentMultiPointGeometry_(segments, geometry) {
+    geometry.getCoordinates().forEach((point) => {
+      segments.push([point]);
+    });
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/MultiPolygon.js").default} geometry Geometry.
    * @private
    */
-  writeMultiPolygonGeometry_(feature, geometry) {
+  segmentMultiPolygonGeometry_(segments, geometry) {
     const polygons = geometry.getCoordinates();
     for (let k = 0, kk = polygons.length; k < kk; ++k) {
       const rings = polygons[k];
       for (let j = 0, jj = rings.length; j < jj; ++j) {
         const coordinates = rings[j];
         for (let i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-          const segment = coordinates.slice(i, i + 2);
-          const segmentData = {
-            feature: feature,
-            segment: segment,
-          };
-          this.rBush_.insert(boundingExtent(segment), segmentData);
+          segments.push(coordinates.slice(i, i + 2));
         }
       }
     }
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/Point.js").default} geometry Geometry.
    * @private
    */
-  writePointGeometry_(feature, geometry) {
-    const coordinates = geometry.getCoordinates();
-    const segmentData = {
-      feature: feature,
-      segment: [coordinates, coordinates],
-    };
-    this.rBush_.insert(geometry.getExtent(), segmentData);
+  segmentPointGeometry_(segments, geometry) {
+    segments.push([geometry.getCoordinates()]);
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/Polygon.js").default} geometry Geometry.
    * @private
    */
-  writePolygonGeometry_(feature, geometry) {
+  segmentPolygonGeometry_(segments, geometry) {
     const rings = geometry.getCoordinates();
     for (let j = 0, jj = rings.length; j < jj; ++j) {
       const coordinates = rings[j];
       for (let i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-        const segment = coordinates.slice(i, i + 2);
-        const segmentData = {
-          feature: feature,
-          segment: segment,
-        };
-        this.rBush_.insert(boundingExtent(segment), segmentData);
+        segments.push(coordinates.slice(i, i + 2));
       }
     }
   }

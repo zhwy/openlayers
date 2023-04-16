@@ -7,7 +7,6 @@
  * See https://mapbox.com/developers/api/.
  */
 
-import SourceState from './State.js';
 import TileImage from './TileImage.js';
 import {applyTransform, intersects} from '../extent.js';
 import {assert} from '../asserts.js';
@@ -40,7 +39,8 @@ import {jsonp as requestJSONP} from '../net.js';
  * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
  * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
  * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
  * @property {boolean} [jsonp=false] Use JSONP with callback to load the TileJSON.
  * Useful when the server does not support CORS..
  * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
@@ -78,10 +78,10 @@ class TileJSON extends TileImage {
       attributions: options.attributions,
       cacheSize: options.cacheSize,
       crossOrigin: options.crossOrigin,
-      imageSmoothing: options.imageSmoothing,
+      interpolate: options.interpolate,
       projection: getProjection('EPSG:3857'),
       reprojectionErrorThreshold: options.reprojectionErrorThreshold,
-      state: SourceState.LOADING,
+      state: 'loading',
       tileLoadFunction: options.tileLoadFunction,
       wrapX: options.wrapX !== undefined ? options.wrapX : true,
       transition: options.transition,
@@ -131,7 +131,7 @@ class TileJSON extends TileImage {
     if (!client.status || (client.status >= 200 && client.status < 300)) {
       let response;
       try {
-        response = /** @type {TileJSON} */ (JSON.parse(client.responseText));
+        response = /** @type {Config} */ (JSON.parse(client.responseText));
       } catch (err) {
         this.handleTileJSONError();
         return;
@@ -188,7 +188,7 @@ class TileJSON extends TileImage {
 
     this.tileUrlFunction = createFromTemplates(tileJSON['tiles'], tileGrid);
 
-    if (tileJSON['attribution'] !== undefined && !this.getAttributions()) {
+    if (tileJSON['attribution'] && !this.getAttributions()) {
       const attributionExtent = extent !== undefined ? extent : gridExtent;
       this.setAttributions(function (frameState) {
         if (intersects(attributionExtent, frameState.extent)) {
@@ -198,14 +198,14 @@ class TileJSON extends TileImage {
       });
     }
     this.tileJSON_ = tileJSON;
-    this.setState(SourceState.READY);
+    this.setState('ready');
   }
 
   /**
    * @protected
    */
   handleTileJSONError() {
-    this.setState(SourceState.ERROR);
+    this.setState('error');
   }
 }
 

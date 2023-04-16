@@ -5,9 +5,12 @@ import View from '../src/ol/View.js';
 import Worker from 'worker-loader!./offscreen-canvas.worker.js'; //eslint-disable-line
 import stringify from 'json-stringify-safe';
 import {FullScreen} from '../src/ol/control.js';
-import {compose, create} from '../src/ol/transform.js';
+import {
+  compose,
+  create,
+  toString as toTransformString,
+} from '../src/ol/transform.js';
 import {createXYZ} from '../src/ol/tilegrid.js';
-import {toString as toTransformString} from '../src/ol/transform.js';
 
 const worker = new Worker();
 
@@ -18,7 +21,7 @@ let container,
   workerFrameState,
   mainThreadFrameState;
 
-// Transform the container to account for the differnece between the (newer)
+// Transform the container to account for the difference between the (newer)
 // main thread frameState and the (older) worker frameState
 function updateContainerTransform() {
   if (workerFrameState) {
@@ -92,7 +95,7 @@ const map = new Map({
   ],
   target: 'map',
   view: new View({
-    resolutions: createXYZ({tileSize: 512}).getResolutions89,
+    resolutions: createXYZ({tileSize: 512}).getResolutions(),
     center: [0, 0],
     zoom: 2,
   }),

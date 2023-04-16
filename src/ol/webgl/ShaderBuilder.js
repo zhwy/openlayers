@@ -262,7 +262,7 @@ export class ShaderBuilder {
    * Generates a symbol vertex shader from the builder parameters,
    * intended to be used on point geometries.
    *
-   * Three uniforms are hardcoded in all shaders: `u_projectionMatrix`, `u_offsetScaleMatrix`,
+   * Four uniforms are hardcoded in all shaders: `u_projectionMatrix`, `u_offsetScaleMatrix`,
    * `u_offsetRotateMatrix`, `u_time`.
    *
    * The following attributes are hardcoded and expected to be present in the vertex buffers:
@@ -441,6 +441,7 @@ export function parseLiteralStyle(style) {
     variables: [],
     attributes: [],
     stringLiteralsMap: {},
+    functions: {},
   };
   const parsedSize = expressionToGlsl(
     vertContext,
@@ -471,6 +472,7 @@ export function parseLiteralStyle(style) {
     variables: vertContext.variables,
     attributes: [],
     stringLiteralsMap: vertContext.stringLiteralsMap,
+    functions: {},
   };
   const parsedColor = expressionToGlsl(fragContext, color, ValueTypes.COLOR);
   const parsedOpacity = expressionToGlsl(
@@ -546,6 +548,8 @@ export function parseLiteralStyle(style) {
 
   if (symbStyle.symbolType === 'image' && symbStyle.src) {
     const texture = new Image();
+    texture.crossOrigin =
+      symbStyle.crossOrigin === undefined ? 'anonymous' : symbStyle.crossOrigin;
     texture.src = symbStyle.src;
     builder
       .addUniform('sampler2D u_texture')
@@ -558,7 +562,7 @@ export function parseLiteralStyle(style) {
   // for each feature attribute used in the fragment shader, define a varying that will be used to pass data
   // from the vertex to the fragment shader, as well as an attribute in the vertex shader (if not already present)
   fragContext.attributes.forEach(function (attrName) {
-    if (vertContext.attributes.indexOf(attrName) === -1) {
+    if (!vertContext.attributes.includes(attrName)) {
       vertContext.attributes.push(attrName);
     }
     builder.addVarying(`v_${attrName}`, 'float', `a_${attrName}`);

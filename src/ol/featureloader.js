@@ -1,7 +1,6 @@
 /**
  * @module ol/featureloader
  */
-import FormatType from './format/FormatType.js';
 import {VOID} from './functions.js';
 
 /**
@@ -12,16 +11,16 @@ import {VOID} from './functions.js';
 let withCredentials = false;
 
 /**
- * {@link module:ol/source/Vector} sources use a function of this type to
+ * {@link module:ol/source/Vector~VectorSource} sources use a function of this type to
  * load features.
  *
  * This function takes up to 5 arguments. These are an {@link module:ol/extent~Extent} representing
  * the area to be loaded, a `{number}` representing the resolution (map units per pixel), an
- * {@link module:ol/proj/Projection} for the projection, an optional success callback that should get
+ * {@link module:ol/proj/Projection~Projection} for the projection, an optional success callback that should get
  * the loaded features passed as an argument and an optional failure callback with no arguments. If
  * the callbacks are not used, the corresponding vector source will not fire `'featuresloadend'` and
  * `'featuresloaderror'` events. `this` within the function is bound to the
- * {@link module:ol/source/Vector} it's called from.
+ * {@link module:ol/source/Vector~VectorSource} it's called from.
  *
  * The function is responsible for loading the features and adding them to the
  * source.
@@ -35,12 +34,12 @@ let withCredentials = false;
  */
 
 /**
- * {@link module:ol/source/Vector} sources use a function of this type to
+ * {@link module:ol/source/Vector~VectorSource} sources use a function of this type to
  * get the url to load features from.
  *
  * This function takes an {@link module:ol/extent~Extent} representing the area
  * to be loaded, a `{number}` representing the resolution (map units per pixel)
- * and an {@link module:ol/proj/Projection} for the projection  as
+ * and an {@link module:ol/proj/Projection~Projection} for the projection  as
  * arguments and returns a `{string}` representing the URL.
  * @typedef {function(import("./extent.js").Extent, number, import("./proj/Projection.js").default): string} FeatureUrlFunction
  * @api
@@ -72,7 +71,7 @@ export function loadFeaturesXhr(
     typeof url === 'function' ? url(extent, resolution, projection) : url,
     true
   );
-  if (format.getType() == FormatType.ARRAY_BUFFER) {
+  if (format.getType() == 'arraybuffer') {
     xhr.responseType = 'arraybuffer';
   }
   xhr.withCredentials = withCredentials;
@@ -86,9 +85,9 @@ export function loadFeaturesXhr(
       const type = format.getType();
       /** @type {Document|Node|Object|string|undefined} */
       let source;
-      if (type == FormatType.JSON || type == FormatType.TEXT) {
+      if (type == 'json' || type == 'text') {
         source = xhr.responseText;
-      } else if (type == FormatType.XML) {
+      } else if (type == 'xml') {
         source = xhr.responseXML;
         if (!source) {
           source = new DOMParser().parseFromString(
@@ -96,7 +95,7 @@ export function loadFeaturesXhr(
             'application/xml'
           );
         }
-      } else if (type == FormatType.ARRAY_BUFFER) {
+      } else if (type == 'arraybuffer') {
         source = /** @type {ArrayBuffer} */ (xhr.response);
       }
       if (source) {
@@ -142,7 +141,6 @@ export function xhr(url, format) {
    *      Function called when loading succeeded.
    * @param {function(): void} [failure] Failure
    *      Function called when loading failed.
-   * @this {import("./source/Vector").default}
    */
   return function (extent, resolution, projection, success, failure) {
     const source = /** @type {import("./source/Vector").default} */ (this);

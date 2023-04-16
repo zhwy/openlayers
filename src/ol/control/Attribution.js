@@ -20,12 +20,12 @@ import {removeChildren, replaceNode} from '../dom.js';
  * @property {boolean} [collapsed=true] Specify if attributions should
  * be collapsed at startup.
  * @property {string} [tipLabel='Attributions'] Text label to use for the button tip.
- * @property {string} [label='i'] Text label to use for the
+ * @property {string|HTMLElement} [label='i'] Text label to use for the
  * collapsed attributions button.
  * Instead of text, also an element (e.g. a `span` element) can be used.
  * @property {string} [expandClassName=className + '-expand'] CSS class name for the
  * collapsed attributions button.
- * @property {string|HTMLElement} [collapseLabel='»'] Text label to use
+ * @property {string|HTMLElement} [collapseLabel='›'] Text label to use
  * for the expanded attributions button.
  * Instead of text, also an element (e.g. a `span` element) can be used.
  * @property {string} [collapseClassName=className + '-collapse'] CSS class name for the
@@ -46,10 +46,10 @@ import {removeChildren, replaceNode} from '../dom.js';
  */
 class Attribution extends Control {
   /**
-   * @param {Options} [opt_options] Attribution options.
+   * @param {Options} [options] Attribution options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     super({
       element: document.createElement('div'),
@@ -105,12 +105,12 @@ class Attribution extends Control {
         : className + '-expand';
 
     const collapseLabel =
-      options.collapseLabel !== undefined ? options.collapseLabel : '\u00BB';
+      options.collapseLabel !== undefined ? options.collapseLabel : '\u203A';
 
     const collapseClassName =
       options.collapseClassName !== undefined
         ? options.collapseClassName
-        : className + '-collpase';
+        : className + '-collapse';
 
     if (typeof collapseLabel === 'string') {
       /**
@@ -186,7 +186,7 @@ class Attribution extends Control {
 
   /**
    * Collect a list of visible attributions and set the collapsible state.
-   * @param {import("../PluggableMap.js").FrameState} frameState Frame state.
+   * @param {import("../Map.js").FrameState} frameState Frame state.
    * @return {Array<string>} Attributions.
    * @private
    */
@@ -253,7 +253,7 @@ class Attribution extends Control {
 
   /**
    * @private
-   * @param {?import("../PluggableMap.js").FrameState} frameState Frame state.
+   * @param {?import("../Map.js").FrameState} frameState Frame state.
    */
   updateElement_(frameState) {
     if (!frameState) {

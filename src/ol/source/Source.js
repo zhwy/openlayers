@@ -2,15 +2,18 @@
  * @module ol/source/Source
  */
 import BaseObject from '../Object.js';
-import SourceState from './State.js';
-import {abstract} from '../util.js';
 import {get as getProjection} from '../proj.js';
 
 /**
- * A function that takes a {@link module:ol/PluggableMap~FrameState} and returns a string or
+ * @typedef {'undefined' | 'loading' | 'ready' | 'error'} State
+ * State of the source, one of 'undefined', 'loading', 'ready' or 'error'.
+ */
+
+/**
+ * A function that takes a {@link module:ol/Map~FrameState} and returns a string or
  * an array of strings representing source attributions.
  *
- * @typedef {function(import("../PluggableMap.js").FrameState): (string|Array<string>)} Attribution
+ * @typedef {function(import("../Map.js").FrameState): (string|Array<string>)} Attribution
  */
 
 /**
@@ -29,8 +32,10 @@ import {get as getProjection} from '../proj.js';
  * @property {AttributionLike} [attributions] Attributions.
  * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
- * @property {import("./State.js").default} [state='ready'] State.
+ * @property {import("./Source.js").State} [state='ready'] State.
  * @property {boolean} [wrapX=false] WrapX.
+ * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
+ * the nearest neighbor is used when resampling.
  */
 
 /**
@@ -52,7 +57,7 @@ class Source extends BaseObject {
 
     /**
      * @protected
-     * @type {import("../proj/Projection.js").default}
+     * @type {import("../proj/Projection.js").default|null}
      */
     this.projection = getProjection(options.projection);
 
@@ -80,16 +85,43 @@ class Source extends BaseObject {
 
     /**
      * @private
-     * @type {import("./State.js").default}
+     * @type {import("./Source.js").State}
      */
-    this.state_ =
-      options.state !== undefined ? options.state : SourceState.READY;
+    this.state_ = options.state !== undefined ? options.state : 'ready';
 
     /**
      * @private
      * @type {boolean}
      */
     this.wrapX_ = options.wrapX !== undefined ? options.wrapX : false;
+
+    /**
+     * @private
+     * @type {boolean}
+     */
+    this.interpolate_ = !!options.interpolate;
+
+    /**
+     * @protected
+     * @type {function(import("../View.js").ViewOptions):void}
+     */
+    this.viewResolver = null;
+
+    /**
+     * @protected
+     * @type {function(Error):void}
+     */
+    this.viewRejector = null;
+
+    const self = this;
+    /**
+     * @private
+     * @type {Promise<import("../View.js").ViewOptions>}
+     */
+    this.viewPromise_ = new Promise(function (resolve, reject) {
+      self.viewResolver = resolve;
+      self.viewRejector = reject;
+    });
   }
 
   /**
@@ -111,7 +143,7 @@ class Source extends BaseObject {
 
   /**
    * Get the projection of the source.
-   * @return {import("../proj/Projection.js").default} Projection.
+   * @return {import("../proj/Projection.js").default|null} Projection.
    * @api
    */
   getProjection() {
@@ -119,16 +151,23 @@ class Source extends BaseObject {
   }
 
   /**
-   * @abstract
-   * @return {Array<number>|undefined} Resolutions.
+   * @param {import("../proj/Projection").default} [projection] Projection.
+   * @return {Array<number>|null} Resolutions.
    */
-  getResolutions() {
-    return abstract();
+  getResolutions(projection) {
+    return null;
   }
 
   /**
-   * Get the state of the source, see {@link module:ol/source/State~State} for possible states.
-   * @return {import("./State.js").default} State.
+   * @return {Promise<import("../View.js").ViewOptions>} A promise for view-related properties.
+   */
+  getView() {
+    return this.viewPromise_;
+  }
+
+  /**
+   * Get the state of the source, see {@link import("./Source.js").State} for possible states.
+   * @return {import("./Source.js").State} State.
    * @api
    */
   getState() {
@@ -143,10 +182,10 @@ class Source extends BaseObject {
   }
 
   /**
-   * @return {Object|undefined} Context options.
+   * @return {boolean} Use linear interpolation when resampling.
    */
-  getContextOptions() {
-    return undefined;
+  getInterpolate() {
+    return this.interpolate_;
   }
 
   /**
@@ -171,7 +210,7 @@ class Source extends BaseObject {
 
   /**
    * Set the state of the source.
-   * @param {import("./State.js").default} state State.
+   * @param {import("./Source.js").State} state State.
    */
   setState(state) {
     this.state_ = state;
@@ -182,7 +221,7 @@ class Source extends BaseObject {
 /**
  * Turns the attributions option into an attributions function.
  * @param {AttributionLike|undefined} attributionLike The attribution option.
- * @return {?Attribution} An attribution function (or null).
+ * @return {Attribution|null} An attribution function (or null).
  */
 function adaptAttributions(attributionLike) {
   if (!attributionLike) {

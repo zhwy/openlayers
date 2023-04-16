@@ -9,15 +9,14 @@ import EventType from '../events/EventType.js';
 import ObjectEventType from '../ObjectEventType.js';
 import RBush from '../structs/RBush.js';
 import Source from './Source.js';
-import SourceState from './State.js';
 import VectorEventType from './VectorEventType.js';
 import {TRUE, VOID} from '../functions.js';
 import {all as allStrategy} from '../loadingstrategy.js';
 import {assert} from '../asserts.js';
-import {containsExtent, equals} from '../extent.js';
+import {containsExtent, equals, wrapAndSliceX} from '../extent.js';
 import {extend} from '../array.js';
 import {getUid} from '../util.js';
-import {getValues, isEmpty} from '../obj.js';
+import {isEmpty} from '../obj.js';
 import {listen, unlistenByKey} from '../events.js';
 import {xhr} from '../featureloader.js';
 
@@ -26,23 +25,23 @@ import {xhr} from '../featureloader.js';
  * returns an array of {@link module:ol/extent~Extent} with the extents to load. Usually this
  * is one of the standard {@link module:ol/loadingstrategy} strategies.
  *
- * @typedef {function(import("../extent.js").Extent, number): Array<import("../extent.js").Extent>} LoadingStrategy
+ * @typedef {function(import("../extent.js").Extent, number, import("../proj/Projection.js").default): Array<import("../extent.js").Extent>} LoadingStrategy
  * @api
  */
 
 /**
  * @classdesc
- * Events emitted by {@link module:ol/source/Vector} instances are instances of this
+ * Events emitted by {@link module:ol/source/Vector~VectorSource} instances are instances of this
  * type.
- * @template {import("../geom/Geometry.js").default} Geometry
+ * @template {import("../geom/Geometry.js").default} [Geometry=import("../geom/Geometry.js").default]
  */
 export class VectorSourceEvent extends Event {
   /**
    * @param {string} type Type.
-   * @param {import("../Feature.js").default<Geometry>} [opt_feature] Feature.
-   * @param {Array<import("../Feature.js").default<Geometry>>} [opt_features] Features.
+   * @param {import("../Feature.js").default<Geometry>} [feature] Feature.
+   * @param {Array<import("../Feature.js").default<Geometry>>} [features] Features.
    */
-  constructor(type, opt_feature, opt_features) {
+  constructor(type, feature, features) {
     super(type);
 
     /**
@@ -50,14 +49,14 @@ export class VectorSourceEvent extends Event {
      * @type {import("../Feature.js").default<Geometry>|undefined}
      * @api
      */
-    this.feature = opt_feature;
+    this.feature = feature;
 
     /**
      * The loaded features for the `FEATURESLOADED` event, `undefined` otherwise.
      * @type {Array<import("../Feature.js").default<Geometry>>|undefined}
      * @api
      */
-    this.features = opt_features;
+    this.features = features;
   }
 }
 
@@ -73,8 +72,8 @@ export class VectorSourceEvent extends Event {
 /**
  * @typedef {Object} Options
  * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
- * @property {Array<import("../Feature.js").default>|Collection<import("../Feature.js").default>} [features]
- * Features. If provided as {@link module:ol/Collection}, the features in the source
+ * @property {Array<import("../Feature.js").default<Geometry>>|Collection<import("../Feature.js").default<Geometry>>} [features]
+ * Features. If provided as {@link module:ol/Collection~Collection}, the features in the source
  * and the collection will stay in sync.
  * @property {import("../format/Feature.js").default} [format] The feature format used by the XHR
  * feature loader when `url` is set. Required if `url` is set, otherwise ignored.
@@ -87,28 +86,28 @@ export class VectorSourceEvent extends Event {
  * Example:
  *
  * ```js
- * import {Vector} from 'ol/source';
- * import {GeoJSON} from 'ol/format';
- * import {bbox} from 'ol/loadingstrategy';
+ * import Vector from 'ol/source/Vector.js';
+ * import GeoJSON from 'ol/format/GeoJSON.js';
+ * import {bbox} from 'ol/loadingstrategy.js';
  *
- * var vectorSource = new Vector({
+ * const vectorSource = new Vector({
  *   format: new GeoJSON(),
  *   loader: function(extent, resolution, projection, success, failure) {
- *      var proj = projection.getCode();
- *      var url = 'https://ahocevar.com/geoserver/wfs?service=WFS&' +
+ *      const proj = projection.getCode();
+ *      const url = 'https://ahocevar.com/geoserver/wfs?service=WFS&' +
  *          'version=1.1.0&request=GetFeature&typename=osm:water_areas&' +
  *          'outputFormat=application/json&srsname=' + proj + '&' +
  *          'bbox=' + extent.join(',') + ',' + proj;
- *      var xhr = new XMLHttpRequest();
+ *      const xhr = new XMLHttpRequest();
  *      xhr.open('GET', url);
- *      var onError = function() {
+ *      const onError = function() {
  *        vectorSource.removeLoadedExtent(extent);
  *        failure();
  *      }
  *      xhr.onerror = onError;
  *      xhr.onload = function() {
  *        if (xhr.status == 200) {
- *          var features = vectorSource.getFormat().readFeatures(xhr.responseText);
+ *          const features = vectorSource.getFormat().readFeatures(xhr.responseText);
  *          vectorSource.addFeatures(features);
  *          success(features);
  *        } else {
@@ -117,7 +116,7 @@ export class VectorSourceEvent extends Event {
  *      }
  *      xhr.send();
  *    },
- *    strategy: bbox
+ *    strategy: bbox,
  *  });
  * ```
  * @property {boolean} [overlaps=true] This source may have overlapping geometries.
@@ -155,11 +154,12 @@ export class VectorSourceEvent extends Event {
  * through all features.
  *
  * When set to `false`, the features will be maintained in an
- * {@link module:ol/Collection}, which can be retrieved through
+ * {@link module:ol/Collection~Collection}, which can be retrieved through
  * {@link module:ol/source/Vector~VectorSource#getFeaturesCollection}.
  * @property {boolean} [wrapX=true] Wrap the world horizontally. For vector editing across the
  * -180° and 180° meridians to work properly, this should be set to `false`. The
  * resulting geometry coordinates will then exceed the world bounds.
+ * @template {import("../geom/Geometry.js").default} [Geometry=import("../geom/Geometry.js").default]
  */
 
 /**
@@ -170,29 +170,30 @@ export class VectorSourceEvent extends Event {
  *
  * @fires VectorSourceEvent
  * @api
- * @template {import("../geom/Geometry.js").default} Geometry
+ * @template {import("../geom/Geometry.js").default} [Geometry=import("../geom/Geometry.js").default]
  */
 class VectorSource extends Source {
   /**
-   * @param {Options} [opt_options] Vector source options.
+   * @param {Options<Geometry>} [options] Vector source options.
    */
-  constructor(opt_options) {
-    const options = opt_options || {};
+  constructor(options) {
+    options = options || {};
 
     super({
       attributions: options.attributions,
+      interpolate: true,
       projection: undefined,
-      state: SourceState.READY,
+      state: 'ready',
       wrapX: options.wrapX !== undefined ? options.wrapX : true,
     });
 
     /***
-     * @type {VectorSourceOnSignature<import("../Observable.js").OnReturn>}
+     * @type {VectorSourceOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {VectorSourceOnSignature<import("../Observable.js").OnReturn>}
+     * @type {VectorSourceOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -292,11 +293,14 @@ class VectorSource extends Source {
 
     /**
      * @private
-     * @type {Collection<import("../Feature.js").default<Geometry>>}
+     * @type {Collection<import("../Feature.js").default<Geometry>>|null}
      */
     this.featuresCollection_ = null;
 
-    let collection, features;
+    /** @type {Collection<import("../Feature.js").default<Geometry>>} */
+    let collection;
+    /** @type {Array<import("../Feature.js").default<Geometry>>} */
+    let features;
     if (Array.isArray(options.features)) {
       features = options.features;
     } else if (options.features) {
@@ -320,7 +324,7 @@ class VectorSource extends Source {
    * instead. A feature will not be added to the source if feature with
    * the same id is already there. The reason for this behavior is to avoid
    * feature duplication when using bbox or tile loading strategies.
-   * Note: this also applies if an {@link module:ol/Collection} is used for features,
+   * Note: this also applies if an {@link module:ol/Collection~Collection} is used for features,
    * meaning that if a feature with a duplicate id is added in the collection, it will
    * be removed from it right away.
    * @param {import("../Feature.js").default<Geometry>} feature Feature to add.
@@ -450,10 +454,12 @@ class VectorSource extends Source {
       this.featuresRtree_.load(extents, geometryFeatures);
     }
 
-    for (let i = 0, length = newFeatures.length; i < length; i++) {
-      this.dispatchEvent(
-        new VectorSourceEvent(VectorEventType.ADDFEATURE, newFeatures[i])
-      );
+    if (this.hasListener(VectorEventType.ADDFEATURE)) {
+      for (let i = 0, length = newFeatures.length; i < length; i++) {
+        this.dispatchEvent(
+          new VectorSourceEvent(VectorEventType.ADDFEATURE, newFeatures[i])
+        );
+      }
     }
   }
 
@@ -492,47 +498,39 @@ class VectorSource extends Source {
     collection.addEventListener(
       CollectionEventType.ADD,
       /**
-       * @param {import("../Collection.js").CollectionEvent} evt The collection event
+       * @param {import("../Collection.js").CollectionEvent<import("../Feature.js").default<Geometry>>} evt The collection event
        */
-      function (evt) {
+      (evt) => {
         if (!modifyingCollection) {
           modifyingCollection = true;
-          this.addFeature(
-            /** @type {import("../Feature.js").default<Geometry>} */ (
-              evt.element
-            )
-          );
+          this.addFeature(evt.element);
           modifyingCollection = false;
         }
-      }.bind(this)
+      }
     );
     collection.addEventListener(
       CollectionEventType.REMOVE,
       /**
-       * @param {import("../Collection.js").CollectionEvent} evt The collection event
+       * @param {import("../Collection.js").CollectionEvent<import("../Feature.js").default<Geometry>>} evt The collection event
        */
-      function (evt) {
+      (evt) => {
         if (!modifyingCollection) {
           modifyingCollection = true;
-          this.removeFeature(
-            /** @type {import("../Feature.js").default<Geometry>} */ (
-              evt.element
-            )
-          );
+          this.removeFeature(evt.element);
           modifyingCollection = false;
         }
-      }.bind(this)
+      }
     );
     this.featuresCollection_ = collection;
   }
 
   /**
    * Remove all features from the source.
-   * @param {boolean} [opt_fast] Skip dispatching of {@link module:ol/source/Vector.VectorSourceEvent#event:removefeature removefeature} events.
+   * @param {boolean} [fast] Skip dispatching of {@link module:ol/source/Vector.VectorSourceEvent#event:removefeature} events.
    * @api
    */
-  clear(opt_fast) {
-    if (opt_fast) {
+  clear(fast) {
+    if (fast) {
       for (const featureId in this.featureChangeKeys_) {
         const keys = this.featureChangeKeys_[featureId];
         keys.forEach(unlistenByKey);
@@ -544,7 +542,10 @@ class VectorSource extends Source {
       }
     } else {
       if (this.featuresRtree_) {
-        this.featuresRtree_.forEach(this.removeFeatureInternal.bind(this));
+        const removeAndIgnoreReturn = (feature) => {
+          this.removeFeatureInternal(feature);
+        };
+        this.featuresRtree_.forEach(removeAndIgnoreReturn);
         for (const id in this.nullGeometryFeatures_) {
           this.removeFeatureInternal(this.nullGeometryFeatures_[id]);
         }
@@ -602,9 +603,8 @@ class VectorSource extends Source {
       const geometry = feature.getGeometry();
       if (geometry.intersectsCoordinate(coordinate)) {
         return callback(feature);
-      } else {
-        return undefined;
       }
+      return undefined;
     });
   }
 
@@ -672,8 +672,8 @@ class VectorSource extends Source {
   /**
    * Get the features collection associated with this source. Will be `null`
    * unless the source was configured with `useSpatialIndex` set to `false`, or
-   * with an {@link module:ol/Collection} as `features`.
-   * @return {Collection<import("../Feature.js").default<Geometry>>} The collection of features.
+   * with an {@link module:ol/Collection~Collection} as `features`.
+   * @return {Collection<import("../Feature.js").default<Geometry>>|null} The collection of features.
    * @api
    */
   getFeaturesCollection() {
@@ -693,7 +693,7 @@ class VectorSource extends Source {
     } else if (this.featuresRtree_) {
       features = this.featuresRtree_.getAll();
       if (!isEmpty(this.nullGeometryFeatures_)) {
-        extend(features, getValues(this.nullGeometryFeatures_));
+        extend(features, Object.values(this.nullGeometryFeatures_));
       }
     }
     return /** @type {Array<import("../Feature.js").default<Geometry>>} */ (
@@ -724,17 +724,28 @@ class VectorSource extends Source {
    * features.
    *
    * @param {import("../extent.js").Extent} extent Extent.
+   * @param {import("../proj/Projection.js").default} [projection] Include features
+   * where `extent` exceeds the x-axis bounds of `projection` and wraps around the world.
    * @return {Array<import("../Feature.js").default<Geometry>>} Features.
    * @api
    */
-  getFeaturesInExtent(extent) {
+  getFeaturesInExtent(extent, projection) {
     if (this.featuresRtree_) {
-      return this.featuresRtree_.getInExtent(extent);
+      const multiWorld = projection && projection.canWrapX() && this.getWrapX();
+
+      if (!multiWorld) {
+        return this.featuresRtree_.getInExtent(extent);
+      }
+
+      const extents = wrapAndSliceX(extent, projection);
+
+      return [].concat(
+        ...extents.map((anExtent) => this.featuresRtree_.getInExtent(anExtent))
+      );
     } else if (this.featuresCollection_) {
       return this.featuresCollection_.getArray().slice(0);
-    } else {
-      return [];
     }
+    return [];
   }
 
   /**
@@ -743,13 +754,13 @@ class VectorSource extends Source {
    * This method is not available when the source is configured with
    * `useSpatialIndex` set to `false`.
    * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
-   * @param {function(import("../Feature.js").default<Geometry>):boolean} [opt_filter] Feature filter function.
-   *     The filter function will receive one argument, the {@link module:ol/Feature feature}
+   * @param {function(import("../Feature.js").default<Geometry>):boolean} [filter] Feature filter function.
+   *     The filter function will receive one argument, the {@link module:ol/Feature~Feature feature}
    *     and it should return a boolean value. By default, no filtering is made.
    * @return {import("../Feature.js").default<Geometry>} Closest feature.
    * @api
    */
-  getClosestFeatureToCoordinate(coordinate, opt_filter) {
+  getClosestFeatureToCoordinate(coordinate, filter) {
     // Find the closest feature using branch and bound.  We start searching an
     // infinite extent, and find the distance from the first feature found.  This
     // becomes the closest feature.  We then compute a smaller extent which any
@@ -763,7 +774,7 @@ class VectorSource extends Source {
     const closestPoint = [NaN, NaN];
     let minSquaredDistance = Infinity;
     const extent = [-Infinity, -Infinity, Infinity, Infinity];
-    const filter = opt_filter ? opt_filter : TRUE;
+    filter = filter ? filter : TRUE;
     this.featuresRtree_.forEachInExtent(
       extent,
       /**
@@ -802,13 +813,13 @@ class VectorSource extends Source {
    *
    * This method is not available when the source is configured with
    * `useSpatialIndex` set to `false`.
-   * @param {import("../extent.js").Extent} [opt_extent] Destination extent. If provided, no new extent
+   * @param {import("../extent.js").Extent} [extent] Destination extent. If provided, no new extent
    *     will be created. Instead, that extent's coordinates will be overwritten.
    * @return {import("../extent.js").Extent} Extent.
    * @api
    */
-  getExtent(opt_extent) {
-    return this.featuresRtree_.getExtent(opt_extent);
+  getExtent(extent) {
+    return this.featuresRtree_.getExtent(extent);
   }
 
   /**
@@ -817,7 +828,7 @@ class VectorSource extends Source {
    * `source.getFeatureById(2)` will return a feature with id `'2'` or `2`.
    *
    * @param {string|number} id Feature identifier.
-   * @return {import("../Feature.js").default<Geometry>} The feature (or `null` if not found).
+   * @return {import("../Feature.js").default<Geometry>|null} The feature (or `null` if not found).
    * @api
    */
   getFeatureById(id) {
@@ -829,7 +840,7 @@ class VectorSource extends Source {
    * Get a feature by its internal unique identifier (using `getUid`).
    *
    * @param {string} uid Feature identifier.
-   * @return {import("../Feature.js").default<Geometry>} The feature (or `null` if not found).
+   * @return {import("../Feature.js").default<Geometry>|null} The feature (or `null` if not found).
    */
   getFeatureByUid(uid) {
     const feature = this.uidIndex_[uid];
@@ -920,16 +931,23 @@ class VectorSource extends Source {
     const id = feature.getId();
     if (id !== undefined) {
       return id in this.idIndex_;
-    } else {
-      return getUid(feature) in this.uidIndex_;
     }
+    return getUid(feature) in this.uidIndex_;
   }
 
   /**
    * @return {boolean} Is empty.
    */
   isEmpty() {
-    return this.featuresRtree_.isEmpty() && isEmpty(this.nullGeometryFeatures_);
+    if (this.featuresRtree_) {
+      return (
+        this.featuresRtree_.isEmpty() && isEmpty(this.nullGeometryFeatures_)
+      );
+    }
+    if (this.featuresCollection_) {
+      return this.featuresCollection_.getLength() === 0;
+    }
+    return true;
   }
 
   /**
@@ -939,7 +957,7 @@ class VectorSource extends Source {
    */
   loadFeatures(extent, resolution, projection) {
     const loadedExtentsRtree = this.loadedExtentsRtree_;
-    const extentsToLoad = this.strategy_(extent, resolution);
+    const extentsToLoad = this.strategy_(extent, resolution, projection);
     for (let i = 0, ii = extentsToLoad.length; i < ii; ++i) {
       const extentToLoad = extentsToLoad[i];
       const alreadyLoaded = loadedExtentsRtree.forEachInExtent(
@@ -962,7 +980,7 @@ class VectorSource extends Source {
           extentToLoad,
           resolution,
           projection,
-          function (features) {
+          (features) => {
             --this.loadingExtentsCount_;
             this.dispatchEvent(
               new VectorSourceEvent(
@@ -971,13 +989,13 @@ class VectorSource extends Source {
                 features
               )
             );
-          }.bind(this),
-          function () {
+          },
+          () => {
             --this.loadingExtentsCount_;
             this.dispatchEvent(
               new VectorSourceEvent(VectorEventType.FEATURESLOADERROR)
             );
-          }.bind(this)
+          }
         );
         loadedExtentsRtree.insert(extentToLoad, {extent: extentToLoad.slice()});
       }
@@ -1019,6 +1037,9 @@ class VectorSource extends Source {
    * @api
    */
   removeFeature(feature) {
+    if (!feature) {
+      return;
+    }
     const featureKey = getUid(feature);
     if (featureKey in this.nullGeometryFeatures_) {
       delete this.nullGeometryFeatures_[featureKey];
@@ -1027,18 +1048,26 @@ class VectorSource extends Source {
         this.featuresRtree_.remove(feature);
       }
     }
-    this.removeFeatureInternal(feature);
-    this.changed();
+    const result = this.removeFeatureInternal(feature);
+    if (result) {
+      this.changed();
+    }
   }
 
   /**
    * Remove feature without firing a `change` event.
    * @param {import("../Feature.js").default<Geometry>} feature Feature.
+   * @return {import("../Feature.js").default<Geometry>|undefined} The removed feature
+   *     (or undefined if the feature was not found).
    * @protected
    */
   removeFeatureInternal(feature) {
     const featureKey = getUid(feature);
-    this.featureChangeKeys_[featureKey].forEach(unlistenByKey);
+    const featureChangeKeys = this.featureChangeKeys_[featureKey];
+    if (!featureChangeKeys) {
+      return;
+    }
+    featureChangeKeys.forEach(unlistenByKey);
     delete this.featureChangeKeys_[featureKey];
     const id = feature.getId();
     if (id !== undefined) {
@@ -1048,6 +1077,7 @@ class VectorSource extends Source {
     this.dispatchEvent(
       new VectorSourceEvent(VectorEventType.REMOVEFEATURE, feature)
     );
+    return feature;
   }
 
   /**

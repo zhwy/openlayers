@@ -27,16 +27,16 @@ import {clear} from '../obj.js';
  */
 class Target extends Disposable {
   /**
-   * @param {*} [opt_target] Default event target for dispatched events.
+   * @param {*} [target] Default event target for dispatched events.
    */
-  constructor(opt_target) {
+  constructor(target) {
     super();
 
     /**
      * @private
      * @type {*}
      */
-    this.eventTarget_ = opt_target;
+    this.eventTarget_ = target;
 
     /**
      * @private
@@ -67,7 +67,7 @@ class Target extends Disposable {
     }
     const listeners = this.listeners_ || (this.listeners_ = {});
     const listenersForType = listeners[type] || (listeners[type] = []);
-    if (listenersForType.indexOf(listener) === -1) {
+    if (!listenersForType.includes(listener)) {
       listenersForType.push(listener);
     }
   }
@@ -83,49 +83,50 @@ class Target extends Disposable {
    * @api
    */
   dispatchEvent(event) {
-    /** @type {import("./Event.js").default|Event} */
-    const evt = typeof event === 'string' ? new Event(event) : event;
-    const type = evt.type;
+    const isString = typeof event === 'string';
+    const type = isString ? event : event.type;
+    const listeners = this.listeners_ && this.listeners_[type];
+    if (!listeners) {
+      return;
+    }
+
+    const evt = isString ? new Event(event) : /** @type {Event} */ (event);
     if (!evt.target) {
       evt.target = this.eventTarget_ || this;
     }
-    const listeners = this.listeners_ && this.listeners_[type];
-    let propagate;
-    if (listeners) {
-      const dispatching = this.dispatching_ || (this.dispatching_ = {});
-      const pendingRemovals =
-        this.pendingRemovals_ || (this.pendingRemovals_ = {});
-      if (!(type in dispatching)) {
-        dispatching[type] = 0;
-        pendingRemovals[type] = 0;
-      }
-      ++dispatching[type];
-      for (let i = 0, ii = listeners.length; i < ii; ++i) {
-        if ('handleEvent' in listeners[i]) {
-          propagate = /** @type {import("../events.js").ListenerObject} */ (
-            listeners[i]
-          ).handleEvent(evt);
-        } else {
-          propagate = /** @type {import("../events.js").ListenerFunction} */ (
-            listeners[i]
-          ).call(this, evt);
-        }
-        if (propagate === false || evt.propagationStopped) {
-          propagate = false;
-          break;
-        }
-      }
-      --dispatching[type];
-      if (dispatching[type] === 0) {
-        let pr = pendingRemovals[type];
-        delete pendingRemovals[type];
-        while (pr--) {
-          this.removeEventListener(type, VOID);
-        }
-        delete dispatching[type];
-      }
-      return propagate;
+    const dispatching = this.dispatching_ || (this.dispatching_ = {});
+    const pendingRemovals =
+      this.pendingRemovals_ || (this.pendingRemovals_ = {});
+    if (!(type in dispatching)) {
+      dispatching[type] = 0;
+      pendingRemovals[type] = 0;
     }
+    ++dispatching[type];
+    let propagate;
+    for (let i = 0, ii = listeners.length; i < ii; ++i) {
+      if ('handleEvent' in listeners[i]) {
+        propagate = /** @type {import("../events.js").ListenerObject} */ (
+          listeners[i]
+        ).handleEvent(evt);
+      } else {
+        propagate = /** @type {import("../events.js").ListenerFunction} */ (
+          listeners[i]
+        ).call(this, evt);
+      }
+      if (propagate === false || evt.propagationStopped) {
+        propagate = false;
+        break;
+      }
+    }
+    if (--dispatching[type] === 0) {
+      let pr = pendingRemovals[type];
+      delete pendingRemovals[type];
+      while (pr--) {
+        this.removeEventListener(type, VOID);
+      }
+      delete dispatching[type];
+    }
+    return propagate;
   }
 
   /**
@@ -147,16 +148,16 @@ class Target extends Disposable {
   }
 
   /**
-   * @param {string} [opt_type] Type. If not provided,
+   * @param {string} [type] Type. If not provided,
    *     `true` will be returned if this event target has any listeners.
    * @return {boolean} Has listeners.
    */
-  hasListener(opt_type) {
+  hasListener(type) {
     if (!this.listeners_) {
       return false;
     }
-    return opt_type
-      ? opt_type in this.listeners_
+    return type
+      ? type in this.listeners_
       : Object.keys(this.listeners_).length > 0;
   }
 

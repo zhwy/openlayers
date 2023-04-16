@@ -57,10 +57,6 @@ aerial.on('postrender', function (event) {
   ctx.restore();
 });
 
-swipe.addEventListener(
-  'input',
-  function () {
-    map.render();
-  },
-  false
-);
+swipe.addEventListener('input', function () {
+  map.render();
+});

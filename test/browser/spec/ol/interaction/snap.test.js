@@ -76,6 +76,25 @@ describe('ol.interaction.Snap', function () {
       expect(event.coordinate).to.eql([0, 0]);
     });
 
+    it('can handle view rotation', function () {
+      map.getView().setRotation(Math.PI / 4);
+      map.renderSync();
+
+      const point = new Feature(new Point([0, 0]));
+      const snapInteraction = new Snap({
+        features: new Collection([point]),
+      });
+      snapInteraction.setMap(map);
+
+      const event = {
+        pixel: [6 + width / 2, height / 2 - 3],
+        coordinate: [1, 3],
+        map: map,
+      };
+      snapInteraction.handleEvent(event);
+      expect(event.coordinate).to.eql([0, 0]);
+    });
+
     it('snaps to edges only', function () {
       const point = new Feature(
         new LineString([
@@ -99,6 +118,35 @@ describe('ol.interaction.Snap', function () {
       expect(event.coordinate).to.eql([7, 0]);
     });
 
+    it('snaps to edges in a user projection', function () {
+      const userProjection = 'EPSG:3857';
+      setUserProjection(userProjection);
+      const viewProjection = map.getView().getProjection();
+      const point = new Feature(
+        new LineString([
+          [-10, 0],
+          [10, 0],
+        ]).transform(viewProjection, userProjection)
+      );
+      const snapInteraction = new Snap({
+        features: new Collection([point]),
+        pixelTolerance: 5,
+        vertex: false,
+      });
+      snapInteraction.setMap(map);
+
+      const event = {
+        pixel: [7 + width / 2, height / 2 - 4],
+        coordinate: transform([7, 4], viewProjection, userProjection),
+        map: map,
+      };
+      snapInteraction.handleEvent(event);
+
+      const coordinate = transform([7, 0], viewProjection, userProjection);
+      expect(event.coordinate[0]).to.roughlyEqual(coordinate[0], 1e-10);
+      expect(event.coordinate[1]).to.roughlyEqual(coordinate[1], 1e-10);
+    });
+
     it('snaps to vertices only', function () {
       const point = new Feature(
         new LineString([
@@ -120,6 +168,27 @@ describe('ol.interaction.Snap', function () {
       };
       snapInteraction.handleEvent(event);
       expect(event.coordinate).to.eql([10, 0]);
+    });
+
+    it('snaps to vertex on line', function () {
+      const line = new Feature(
+        new LineString([
+          [0, 0],
+          [50, 0],
+        ])
+      );
+      const point = new Feature(new Point([5, 0]));
+      const snap = new Snap({
+        features: new Collection([line, point]),
+      });
+      snap.setMap(map);
+      const event = {
+        pixel: [3 + width / 2, height / 2],
+        coordinate: [3, 0],
+        map: map,
+      };
+      snap.handleEvent(event);
+      expect(event.coordinate).to.eql([5, 0]);
     });
 
     it('snaps to circle', function () {

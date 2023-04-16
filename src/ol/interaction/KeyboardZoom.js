@@ -30,12 +30,12 @@ import {targetNotEditable} from '../events/condition.js';
  */
 class KeyboardZoom extends Interaction {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
+  constructor(options) {
     super();
 
-    const options = opt_options ? opt_options : {};
+    options = options ? options : {};
 
     /**
      * @private
@@ -57,12 +57,11 @@ class KeyboardZoom extends Interaction {
   }
 
   /**
-   * Handles the {@link module:ol/MapBrowserEvent map browser event} if it was a
+   * Handles the {@link module:ol/MapBrowserEvent~MapBrowserEvent map browser event} if it was a
    * `KeyEvent`, and decides whether to zoom in or out (depending on whether the
    * key pressed was '+' or '-').
    * @param {import("../MapBrowserEvent.js").default} mapBrowserEvent Map browser event.
    * @return {boolean} `false` to stop event propagation.
-   * @this {KeyboardZoom}
    */
   handleEvent(mapBrowserEvent) {
     let stopEvent = false;

@@ -2,8 +2,9 @@ import EventType from '../../../../src/ol/events/EventType.js';
 import GeoJSON from '../../../../src/ol/format/GeoJSON.js';
 import TileGrid from '../../../../src/ol/tilegrid/TileGrid.js';
 import TileState from '../../../../src/ol/TileState.js';
-import VectorTileSource from '../../../../src/ol/source/VectorTile.js';
-import {defaultLoadFunction} from '../../../../src/ol/source/VectorTile.js';
+import VectorTileSource, {
+  defaultLoadFunction,
+} from '../../../../src/ol/source/VectorTile.js';
 import {listen, unlistenByKey} from '../../../../src/ol/events.js';
 
 describe('ol.VectorRenderTile', function () {
@@ -62,6 +63,7 @@ describe('ol.VectorRenderTile', function () {
   });
 
   it("only loads tiles within the source tileGrid's extent", function (done) {
+    let tile;
     const url = 'spec/ol/data/point.json';
     const source = new VectorTileSource({
       projection: 'EPSG:4326',
@@ -76,8 +78,12 @@ describe('ol.VectorRenderTile', function () {
       },
       url: url,
     });
-    const tile = source.getTile(0, 0, 0, 1, source.getProjection());
 
+    tile = source.getTile(0, 0, 0, 1, source.getProjection());
+    expect(tile.getState()).to.be(TileState.EMPTY);
+
+    tile = source.getTile(0, 16, 9, 1, source.getProjection());
+    expect(tile.getState()).to.be(TileState.IDLE);
     tile.load();
     const key = listen(tile, EventType.CHANGE, function () {
       if (tile.getState() === TileState.LOADED) {

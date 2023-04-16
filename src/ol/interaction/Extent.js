@@ -3,7 +3,6 @@
  */
 import Event from '../events/Event.js';
 import Feature from '../Feature.js';
-import GeometryType from '../geom/GeometryType.js';
 import MapBrowserEventType from '../MapBrowserEventType.js';
 import Point from '../geom/Point.js';
 import PointerInteraction from './Pointer.js';
@@ -30,13 +29,13 @@ import {toUserExtent} from '../proj.js';
  * @property {import("../extent.js").Extent} [extent] Initial extent. Defaults to no
  * initial extent.
  * @property {import("../style/Style.js").StyleLike} [boxStyle]
- * Style for the drawn extent box. Defaults to
- * {@link module:ol/style/Style~createEditing()['Polygon']}
+ * Style for the drawn extent box. Defaults to the `Polygon` editing style
+ * documented in {@link module:ol/style/Style~Style}
  * @property {number} [pixelTolerance=10] Pixel tolerance for considering the
  * pointer close enough to a segment or vertex for editing.
  * @property {import("../style/Style.js").StyleLike} [pointerStyle]
- * Style for the cursor used to draw the extent. Defaults to
- * {@link module:ol/style/Style~createEditing()['Point']}
+ * Style for the cursor used to draw the extent. Defaults to the `Point` editing style
+ * documented in {@link module:ol/style/Style~Style}
  * @property {boolean} [wrapX=false] Wrap the drawn extent across multiple maps
  * in the X direction? Only affects visuals, not functionality.
  */
@@ -95,20 +94,20 @@ export class ExtentEvent extends Event {
  */
 class Extent extends PointerInteraction {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
-    const options = opt_options || {};
+  constructor(options) {
+    options = options || {};
 
     super(/** @type {import("./Pointer.js").Options} */ (options));
 
     /***
-     * @type {ExtentOnSignature<import("../Observable.js").OnReturn>}
+     * @type {ExtentOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {ExtentOnSignature<import("../Observable.js").OnReturn>}
+     * @type {ExtentOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -167,8 +166,8 @@ class Extent extends PointerInteraction {
      */
     this.vertexFeature_ = null;
 
-    if (!opt_options) {
-      opt_options = {};
+    if (!options) {
+      options = {};
     }
 
     /**
@@ -179,10 +178,10 @@ class Extent extends PointerInteraction {
     this.extentOverlay_ = new VectorLayer({
       source: new VectorSource({
         useSpatialIndex: false,
-        wrapX: !!opt_options.wrapX,
+        wrapX: !!options.wrapX,
       }),
-      style: opt_options.boxStyle
-        ? opt_options.boxStyle
+      style: options.boxStyle
+        ? options.boxStyle
         : getDefaultExtentStyleFunction(),
       updateWhileAnimating: true,
       updateWhileInteracting: true,
@@ -196,23 +195,23 @@ class Extent extends PointerInteraction {
     this.vertexOverlay_ = new VectorLayer({
       source: new VectorSource({
         useSpatialIndex: false,
-        wrapX: !!opt_options.wrapX,
+        wrapX: !!options.wrapX,
       }),
-      style: opt_options.pointerStyle
-        ? opt_options.pointerStyle
+      style: options.pointerStyle
+        ? options.pointerStyle
         : getDefaultPointerStyleFunction(),
       updateWhileAnimating: true,
       updateWhileInteracting: true,
     });
 
-    if (opt_options.extent) {
-      this.setExtent(opt_options.extent);
+    if (options.extent) {
+      this.setExtent(options.extent);
     }
   }
 
   /**
    * @param {import("../pixel.js").Pixel} pixel cursor location
-   * @param {import("../PluggableMap.js").default} map map
+   * @param {import("../Map.js").default} map map
    * @return {import("../coordinate.js").Coordinate|null} snapped vertex on extent
    * @private
    */
@@ -425,7 +424,7 @@ class Extent extends PointerInteraction {
    * Remove the interaction from its current map and attach it to the new map.
    * Subclasses may set up event handlers to get notified about changes to
    * the map here.
-   * @param {import("../PluggableMap.js").default} map Map.
+   * @param {import("../Map.js").default} map Map.
    */
   setMap(map) {
     this.extentOverlay_.setMap(map);
@@ -478,7 +477,7 @@ class Extent extends PointerInteraction {
 function getDefaultExtentStyleFunction() {
   const style = createEditingStyle();
   return function (feature, resolution) {
-    return style[GeometryType.POLYGON];
+    return style['Polygon'];
   };
 }
 
@@ -490,7 +489,7 @@ function getDefaultExtentStyleFunction() {
 function getDefaultPointerStyleFunction() {
   const style = createEditingStyle();
   return function (feature, resolution) {
-    return style[GeometryType.POINT];
+    return style['Point'];
   };
 }
 
@@ -518,9 +517,8 @@ function getEdgeHandler(fixedP1, fixedP2) {
     return function (point) {
       return boundingExtent([fixedP1, [fixedP2[0], point[1]]]);
     };
-  } else {
-    return null;
   }
+  return null;
 }
 
 /**

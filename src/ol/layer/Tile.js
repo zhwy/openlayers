@@ -13,22 +13,17 @@ import CanvasTileLayerRenderer from '../renderer/canvas/TileLayer.js';
  * options means that `title` is observable, and has get/set accessors.
  *
  * @template {import("../source/Tile.js").default} TileSourceType
- * @extends {BaseTileLayer<TileSourceType>}
+ * @extends BaseTileLayer<TileSourceType, CanvasTileLayerRenderer>
  * @api
  */
 class TileLayer extends BaseTileLayer {
   /**
-   * @param {import("./BaseTile.js").Options<TileSourceType>} [opt_options] Tile layer options.
+   * @param {import("./BaseTile.js").Options<TileSourceType>} [options] Tile layer options.
    */
-  constructor(opt_options) {
-    super(opt_options);
+  constructor(options) {
+    super(options);
   }
 
-  /**
-   * Create a renderer for this layer.
-   * @return {import("../renderer/Layer.js").default} A layer renderer.
-   * @protected
-   */
   createRenderer() {
     return new CanvasTileLayerRenderer(this);
   }

@@ -1,12 +1,11 @@
 import esMain from 'es-main';
 import fse from 'fs-extra';
-import path from 'path';
-import {dirname} from 'path';
+import path, {dirname} from 'path';
 import {fileURLToPath} from 'url';
 import {spawn} from 'child_process';
 import {walk} from 'walk';
 
-const isWindows = process.platform.indexOf('win') === 0;
+const isWindows = process.platform.startsWith('win');
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
 const sourceDir = path.join(baseDir, '..', 'src');
@@ -70,7 +69,7 @@ function getPaths() {
     const walker = walk(sourceDir);
     walker.on('file', (root, stats, next) => {
       const sourcePath = path.join(root, stats.name);
-      if (/\.js$/.test(sourcePath)) {
+      if (sourcePath.endsWith('.js')) {
         paths.push(sourcePath);
       }
       next();

@@ -4,7 +4,7 @@ import esMain from 'es-main';
 import express from 'express';
 import fs from 'fs';
 import fse from 'fs-extra';
-import path from 'path';
+import path, {dirname} from 'path';
 import pixelmatch from 'pixelmatch';
 import png from 'pngjs';
 import puppeteer from 'puppeteer';
@@ -13,7 +13,6 @@ import webpack from 'webpack';
 import webpackMiddleware from 'webpack-dev-middleware';
 import yargs from 'yargs';
 import {LogLevel} from 'loglevelnext/dist/LogLevel.js';
-import {dirname} from 'path';
 import {fileURLToPath} from 'url';
 import {globby} from 'globby';
 import {hideBin} from 'yargs/helpers';
@@ -49,7 +48,7 @@ function indexHandler(req, res) {
 function notFound(req, res) {
   return () => {
     // first, try the default directory
-    if (req.url.match(/^\/cases\/[^\/]+\/(index.html)?$/)) {
+    if (/^\/cases\/[^\/]+\/(index.html)?$/.test(req.url)) {
       // request for a case index file, and file not found, use default
       req.url = '/index.html';
       return defaultHandler(req, res, () => indexHandler(req, res));

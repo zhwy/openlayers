@@ -3,16 +3,15 @@
  */
 import Layer from './Layer.js';
 import TileProperty from './TileProperty.js';
-import {assign} from '../obj.js';
 
 /***
  * @template Return
  * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes, import("../events/Event.js").default, Return> &
  *   import("../Observable").OnSignature<import("./Base").BaseLayerObjectEventTypes|
- *     'change:source'|'change:preload'|'change:useInterimTilesOnError', import("../Object").ObjectEvent, Return> &
+ *     import("./Layer.js").LayerEventType|'change:preload'|'change:useInterimTilesOnError', import("../Object").ObjectEvent, Return> &
  *   import("../Observable").OnSignature<import("../render/EventType").LayerRenderEventTypes, import("../render/Event").default, Return> &
  *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|import("./Base").BaseLayerObjectEventTypes|
- *   'change:source'|'change:preload'|'change:useInterimTilesOnError'|import("../render/EventType").LayerRenderEventTypes, Return>} BaseTileLayerOnSignature
+ *   import("./Layer.js").LayerEventType|'change:preload'|'change:useInterimTilesOnError'|import("../render/EventType").LayerRenderEventTypes, Return>} BaseTileLayerOnSignature
  */
 
 /**
@@ -38,10 +37,10 @@ import {assign} from '../obj.js';
  * @property {number} [preload=0] Preload. Load low-resolution tiles up to `preload` levels. `0`
  * means no preloading.
  * @property {TileSourceType} [source] Source for this layer.
- * @property {import("../PluggableMap.js").default} [map] Sets the layer as overlay on a map. The map will not manage
+ * @property {import("../Map.js").default} [map] Sets the layer as overlay on a map. The map will not manage
  * this layer in its layers collection, and the layer will be rendered on top. This is useful for
  * temporary layers. The standard way to add a layer to a map and have it managed by the map is to
- * use {@link import("../PluggableMap.js").default#addLayer map.addLayer()}.
+ * use {@link import("../Map.js").default#addLayer map.addLayer()}.
  * @property {boolean} [useInterimTilesOnError=true] Use interim tiles on error.
  * @property {Object<string, *>} [properties] Arbitrary observable properties. Can be accessed with `#get()` and `#set()`.
  */
@@ -55,29 +54,30 @@ import {assign} from '../obj.js';
  * options means that `title` is observable, and has get/set accessors.
  *
  * @template {import("../source/Tile.js").default} TileSourceType
- * @extends {Layer<TileSourceType>}
+ * @template {import("../renderer/Layer.js").default} RendererType
+ * @extends {Layer<TileSourceType, RendererType>}
  * @api
  */
 class BaseTileLayer extends Layer {
   /**
-   * @param {Options<TileSourceType>} [opt_options] Tile layer options.
+   * @param {Options<TileSourceType>} [options] Tile layer options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
-    const baseOptions = assign({}, options);
+    const baseOptions = Object.assign({}, options);
 
     delete baseOptions.preload;
     delete baseOptions.useInterimTilesOnError;
     super(baseOptions);
 
     /***
-     * @type {BaseTileLayerOnSignature<import("../Observable.js").OnReturn>}
+     * @type {BaseTileLayerOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {BaseTileLayerOnSignature<import("../Observable.js").OnReturn>}
+     * @type {BaseTileLayerOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -134,6 +134,26 @@ class BaseTileLayer extends Layer {
    */
   setUseInterimTilesOnError(useInterimTilesOnError) {
     this.set(TileProperty.USE_INTERIM_TILES_ON_ERROR, useInterimTilesOnError);
+  }
+
+  /**
+   * Get data for a pixel location.  The return type depends on the source data.  For image tiles,
+   * a four element RGBA array will be returned.  For data tiles, the array length will match the
+   * number of bands in the dataset.  For requests outside the layer extent, `null` will be returned.
+   * Data for a image tiles can only be retrieved if the source's `crossOrigin` property is set.
+   *
+   * ```js
+   * // display layer data on every pointer move
+   * map.on('pointermove', (event) => {
+   *   console.log(layer.getData(event.pixel));
+   * });
+   * ```
+   * @param {import("../pixel").Pixel} pixel Pixel.
+   * @return {Uint8ClampedArray|Uint8Array|Float32Array|DataView|null} Pixel data.
+   * @api
+   */
+  getData(pixel) {
+    return super.getData(pixel);
   }
 }
 

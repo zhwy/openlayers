@@ -87,7 +87,7 @@ class GeolocationError extends BaseEvent {
  *
  * Example:
  *
- *     var geolocation = new Geolocation({
+ *     const geolocation = new Geolocation({
  *       // take the projection to use from the map's view
  *       projection: view.getProjection()
  *     });
@@ -101,18 +101,18 @@ class GeolocationError extends BaseEvent {
  */
 class Geolocation extends BaseObject {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
+  constructor(options) {
     super();
 
     /***
-     * @type {GeolocationOnSignature<import("./Observable.js").OnReturn>}
+     * @type {GeolocationOnSignature<import("./events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {GeolocationOnSignature<import("./Observable.js").OnReturn>}
+     * @type {GeolocationOnSignature<import("./events").EventsKey>}
      */
     this.once;
 
@@ -121,7 +121,7 @@ class Geolocation extends BaseObject {
      */
     this.un;
 
-    const options = opt_options || {};
+    options = options || {};
 
     /**
      * The unprojected (EPSG:4326) device position.
@@ -224,7 +224,7 @@ class Geolocation extends BaseObject {
       this.position_[1] = coords.latitude;
     }
     const projectedPosition = this.transform_(this.position_);
-    this.set(Property.POSITION, projectedPosition);
+    this.set(Property.POSITION, projectedPosition.slice());
     this.set(Property.SPEED, coords.speed === null ? undefined : coords.speed);
     const geometry = circularPolygon(this.position_, coords.accuracy);
     geometry.applyTransform(this.transform_);

@@ -5,19 +5,17 @@
 import EventType from '../events/EventType.js';
 import Tile from '../VectorTile.js';
 import TileCache from '../TileCache.js';
+import TileGrid from '../tilegrid/TileGrid.js';
 import TileState from '../TileState.js';
 import UrlTile from './UrlTile.js';
 import VectorRenderTile from '../VectorRenderTile.js';
+import {DEFAULT_MAX_ZOOM} from '../tilegrid/common.js';
 import {
   buffer as bufferExtent,
   getIntersection,
   intersects,
 } from '../extent.js';
-import {
-  createForProjection,
-  createXYZ,
-  extentFromProjection,
-} from '../tilegrid.js';
+import {createXYZ, extentFromProjection} from '../tilegrid.js';
 import {fromKey, getCacheKeyForTileKey, getKeyZXY} from '../tilecoord.js';
 import {isEmpty} from '../obj.js';
 import {loadFeaturesXhr} from '../featureloader.js';
@@ -35,9 +33,9 @@ import {toSize} from '../size.js';
  * boundaries or TopoJSON sources) allows the renderer to optimise fill and
  * stroke operations.
  * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Projection of the tile grid.
- * @property {import("./State.js").default} [state] Source state.
+ * @property {import("./Source.js").State} [state] Source state.
  * @property {typeof import("../VectorTile.js").default} [tileClass] Class used to instantiate image tiles.
- * Default is {@link module:ol/VectorTile}.
+ * Default is {@link module:ol/VectorTile~VectorTile}.
  * @property {number} [maxZoom=22] Optional max zoom level. Not used if `tileGrid` is provided.
  * @property {number} [minZoom] Optional min zoom level. Not used if `tileGrid` is provided.
  * @property {number|import("../size.js").Size} [tileSize=512] Optional tile size. Not used if `tileGrid` is provided.
@@ -91,11 +89,11 @@ import {toSize} from '../size.js';
 /**
  * @classdesc
  * Class for layer sources providing vector data divided into a tile grid, to be
- * used with {@link module:ol/layer/VectorTile~VectorTile}. Although this source receives tiles
+ * used with {@link module:ol/layer/VectorTile~VectorTileLayer}. Although this source receives tiles
  * with vector features from the server, it is not meant for feature editing.
  * Features are optimized for rendering, their geometries are clipped at or near
  * tile boundaries and simplified for a view resolution. See
- * {@link module:ol/source/Vector} for vector sources that are suitable for feature
+ * {@link module:ol/source/Vector~VectorSource} for vector sources that are suitable for feature
  * editing.
  *
  * @fires import("./Tile.js").TileSourceEvent
@@ -124,6 +122,7 @@ class VectorTile extends UrlTile {
       attributions: options.attributions,
       attributionsCollapsible: options.attributionsCollapsible,
       cacheSize: options.cacheSize,
+      interpolate: true,
       opaque: false,
       projection: projection,
       state: options.state,
@@ -141,7 +140,7 @@ class VectorTile extends UrlTile {
 
     /**
      * @private
-     * @type {import("../format/Feature.js").default}
+     * @type {import("../format/Feature.js").default|null}
      */
     this.format_ = options.format ? options.format : null;
 
@@ -239,8 +238,9 @@ class VectorTile extends UrlTile {
     const tileCache = this.getTileCacheForProjection(projection);
     const usedSourceTiles = Object.keys(usedTiles).reduce((acc, key) => {
       const cacheKey = getCacheKeyForTileKey(key);
-      if (tileCache.containsKey(cacheKey)) {
-        const sourceTiles = tileCache.get(cacheKey).sourceTiles;
+      const tile = tileCache.peek(cacheKey);
+      if (tile) {
+        const sourceTiles = tile.sourceTiles;
         for (let i = 0, ii = sourceTiles.length; i < ii; ++i) {
           acc[sourceTiles[i].getKey()] = true;
         }
@@ -272,7 +272,10 @@ class VectorTile extends UrlTile {
       if (sourceExtent) {
         getIntersection(extent, sourceExtent, extent);
       }
-      const sourceZ = sourceTileGrid.getZForResolution(resolution, 1);
+      const sourceZ = sourceTileGrid.getZForResolution(
+        resolution,
+        this.zDirection
+      );
 
       sourceTileGrid.forEachTileCoord(extent, sourceZ, (sourceTileCoord) => {
         const tileUrl = this.tileUrlFunction(
@@ -387,15 +390,11 @@ class VectorTile extends UrlTile {
       // make extent 1 pixel smaller so we don't load tiles for < 0.5 pixel render space
       const extent = tileGrid.getTileCoordExtent(urlTileCoord);
       bufferExtent(extent, -resolution, extent);
-      sourceTileGrid.forEachTileCoord(
-        extent,
-        sourceZ,
-        function (sourceTileCoord) {
-          empty =
-            empty &&
-            !this.tileUrlFunction(sourceTileCoord, pixelRatio, projection);
-        }.bind(this)
-      );
+      sourceTileGrid.forEachTileCoord(extent, sourceZ, (sourceTileCoord) => {
+        empty =
+          empty &&
+          !this.tileUrlFunction(sourceTileCoord, pixelRatio, projection);
+      });
     }
     const newTile = new VectorRenderTile(
       tileCoord,
@@ -426,13 +425,25 @@ class VectorTile extends UrlTile {
       // A tile grid that matches the tile size of the source tile grid is more
       // likely to have 1:1 relationships between source tiles and rendered tiles.
       const sourceTileGrid = this.tileGrid;
-      tileGrid = createForProjection(
-        projection,
-        undefined,
-        sourceTileGrid
-          ? sourceTileGrid.getTileSize(sourceTileGrid.getMinZoom())
-          : undefined
-      );
+      const resolutions = sourceTileGrid.getResolutions().slice();
+      const origins = resolutions.map(function (resolution, z) {
+        return sourceTileGrid.getOrigin(z);
+      });
+      const tileSizes = resolutions.map(function (resolution, z) {
+        return sourceTileGrid.getTileSize(z);
+      });
+      const length = DEFAULT_MAX_ZOOM + 1;
+      for (let z = resolutions.length; z < length; ++z) {
+        resolutions.push(resolutions[z - 1] / 2);
+        origins.push(origins[z - 1]);
+        tileSizes.push(tileSizes[z - 1]);
+      }
+      tileGrid = new TileGrid({
+        extent: sourceTileGrid.getExtent(),
+        origins: origins,
+        resolutions: resolutions,
+        tileSizes: tileSizes,
+      });
       this.tileGrids_[code] = tileGrid;
     }
     return tileGrid;

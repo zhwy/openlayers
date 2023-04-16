@@ -4,7 +4,12 @@
 import GML2 from './GML2.js';
 import GML3 from './GML3.js';
 import GMLBase from './GMLBase.js';
-import {makeArrayPusher, makeChildAppender, makeReplacer} from '../xml.js';
+import {
+  makeArrayExtender,
+  makeArrayPusher,
+  makeChildAppender,
+  makeReplacer,
+} from '../xml.js';
 import {writeStringTextNode} from '../format/xsd.js';
 
 /**
@@ -14,12 +19,10 @@ import {writeStringTextNode} from '../format/xsd.js';
  */
 class GML32 extends GML3 {
   /**
-   * @param {import("./GMLBase.js").Options} [opt_options] Optional configuration object.
+   * @param {import("./GMLBase.js").Options} [options] Optional configuration object.
    */
-  constructor(opt_options) {
-    const options = /** @type {import("./GMLBase.js").Options} */ (
-      opt_options ? opt_options : {}
-    );
+  constructor(options) {
+    options = options ? options : {};
 
     super(options);
 
@@ -169,7 +172,9 @@ GML32.prototype.PATCHES_PARSERS = {
  */
 GML32.prototype.SEGMENTS_PARSERS = {
   'http://www.opengis.net/gml/3.2': {
-    'LineStringSegment': makeReplacer(GML3.prototype.readLineStringSegment),
+    'LineStringSegment': makeArrayExtender(
+      GML3.prototype.readLineStringSegment
+    ),
   },
 };
 
@@ -247,6 +252,7 @@ GML32.prototype.POLYGONMEMBER_PARSERS = {
 GML32.prototype.RING_PARSERS = {
   'http://www.opengis.net/gml/3.2': {
     'LinearRing': makeReplacer(GMLBase.prototype.readFlatLinearRing),
+    'Ring': makeReplacer(GML32.prototype.readFlatCurveRing),
   },
 };
 

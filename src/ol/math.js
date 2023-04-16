@@ -15,57 +15,6 @@ export function clamp(value, min, max) {
 }
 
 /**
- * Return the hyperbolic cosine of a given number. The method will use the
- * native `Math.cosh` function if it is available, otherwise the hyperbolic
- * cosine will be calculated via the reference implementation of the Mozilla
- * developer network.
- *
- * @param {number} x X.
- * @return {number} Hyperbolic cosine of x.
- */
-export const cosh = (function () {
-  // Wrapped in a iife, to save the overhead of checking for the native
-  // implementation on every invocation.
-  let cosh;
-  if ('cosh' in Math) {
-    // The environment supports the native Math.cosh function, use it…
-    cosh = Math.cosh;
-  } else {
-    // … else, use the reference implementation of MDN:
-    cosh = function (x) {
-      const y = /** @type {Math} */ (Math).exp(x);
-      return (y + 1 / y) / 2;
-    };
-  }
-  return cosh;
-})();
-
-/**
- * Return the base 2 logarithm of a given number. The method will use the
- * native `Math.log2` function if it is available, otherwise the base 2
- * logarithm will be calculated via the reference implementation of the
- * Mozilla developer network.
- *
- * @param {number} x X.
- * @return {number} Base 2 logarithm of x.
- */
-export const log2 = (function () {
-  // Wrapped in a iife, to save the overhead of checking for the native
-  // implementation on every invocation.
-  let log2;
-  if ('log2' in Math) {
-    // The environment supports the native Math.log2 function, use it…
-    log2 = Math.log2;
-  } else {
-    // … else, use the reference implementation of MDN:
-    log2 = function (x) {
-      return Math.log(x) * Math.LOG2E;
-    };
-  }
-  return log2;
-})();
-
-/**
  * Returns the square of the closest distance between the point (x, y) and the
  * line segment (x1, y1) to (x2, y2).
  * @param {number} x X.
@@ -203,4 +152,48 @@ export function modulo(a, b) {
  */
 export function lerp(a, b, x) {
   return a + x * (b - a);
+}
+
+/**
+ * Returns a number with a limited number of decimal digits.
+ * @param {number} n The input number.
+ * @param {number} decimals The maximum number of decimal digits.
+ * @return {number} The input number with a limited number of decimal digits.
+ */
+export function toFixed(n, decimals) {
+  const factor = Math.pow(10, decimals);
+  return Math.round(n * factor) / factor;
+}
+
+/**
+ * Rounds a number to the nearest integer value considering only the given number
+ * of decimal digits (with rounding on the final digit).
+ * @param {number} n The input number.
+ * @param {number} decimals The maximum number of decimal digits.
+ * @return {number} The nearest integer.
+ */
+export function round(n, decimals) {
+  return Math.round(toFixed(n, decimals));
+}
+
+/**
+ * Rounds a number to the next smaller integer considering only the given number
+ * of decimal digits (with rounding on the final digit).
+ * @param {number} n The input number.
+ * @param {number} decimals The maximum number of decimal digits.
+ * @return {number} The next smaller integer.
+ */
+export function floor(n, decimals) {
+  return Math.floor(toFixed(n, decimals));
+}
+
+/**
+ * Rounds a number to the next bigger integer considering only the given number
+ * of decimal digits (with rounding on the final digit).
+ * @param {number} n The input number.
+ * @param {number} decimals The maximum number of decimal digits.
+ * @return {number} The next bigger integer.
+ */
+export function ceil(n, decimals) {
+  return Math.ceil(toFixed(n, decimals));
 }

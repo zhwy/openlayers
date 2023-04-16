@@ -21,11 +21,11 @@ const ATTRIBUTIONS = [
  */
 const LayerConfig = {
   'terrain': {
-    extension: 'jpg',
+    extension: 'png',
     opaque: true,
   },
   'terrain-background': {
-    extension: 'jpg',
+    extension: 'png',
     opaque: true,
   },
   'terrain-labels': {
@@ -87,7 +87,8 @@ const ProviderConfig = {
 /**
  * @typedef {Object} Options
  * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
  * @property {string} layer Layer name.
  * @property {number} [minZoom] Minimum zoom.
  * @property {number} [maxZoom] Maximum zoom.
@@ -137,7 +138,7 @@ class Stamen extends XYZ {
       attributions: ATTRIBUTIONS,
       cacheSize: options.cacheSize,
       crossOrigin: 'anonymous',
-      imageSmoothing: options.imageSmoothing,
+      interpolate: options.interpolate,
       maxZoom:
         options.maxZoom != undefined ? options.maxZoom : providerConfig.maxZoom,
       minZoom:

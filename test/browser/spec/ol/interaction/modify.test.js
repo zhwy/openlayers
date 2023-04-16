@@ -20,8 +20,11 @@ import {
   clearUserProjection,
   setUserProjection,
 } from '../../../../../src/ol/proj.js';
-import {doubleClick, never} from '../../../../../src/ol/events/condition.js';
-import {getValues} from '../../../../../src/ol/obj.js';
+import {
+  click,
+  doubleClick,
+  never,
+} from '../../../../../src/ol/events/condition.js';
 
 describe('ol.interaction.Modify', function () {
   let target, map, layer, source, features;
@@ -414,6 +417,52 @@ describe('ol.interaction.Modify', function () {
       expect(lineFeature.getGeometry().getCoordinates()[0][2]).to.equal(10);
       expect(lineFeature.getGeometry().getCoordinates()[2][2]).to.equal(30);
       expect(lineFeature.getGeometry().getCoordinates()[4][2]).to.equal(50);
+    });
+
+    it('keeps polygon geometries valid', function () {
+      const overlappingVertexFeature = new Feature({
+        geometry: new Polygon([
+          [
+            [10, 20],
+            [0, 20],
+            [0, 0],
+            [20, 0],
+            [20, 20],
+            [10, 20],
+            [15, 15],
+            [5, 15],
+            [10, 20],
+          ],
+        ]),
+      });
+      features.length = 0;
+      features.push(overlappingVertexFeature);
+
+      const modify = new Modify({
+        features: new Collection(features),
+      });
+      map.addInteraction(modify);
+
+      let coords, exteriorRing;
+      coords = overlappingVertexFeature.getGeometry().getCoordinates();
+      exteriorRing = coords[0];
+
+      expect(exteriorRing.length).to.equal(9);
+      expect(exteriorRing[0]).to.eql(exteriorRing[exteriorRing.length - 1]);
+
+      // move the overlapping vertice
+      simulateEvent('pointermove', 10, -20, null, 0);
+      simulateEvent('pointerdown', 10, -20, null, 0);
+      simulateEvent('pointermove', 10, -25, null, 0);
+      simulateEvent('pointerdrag', 10, -25, null, 0);
+      simulateEvent('pointerup', 10, -25, null, 0);
+
+      coords = overlappingVertexFeature.getGeometry().getCoordinates();
+      exteriorRing = coords[0];
+
+      expect(exteriorRing.length).to.equal(9);
+      expect(exteriorRing[0]).to.eql([10, 25]);
+      expect(exteriorRing[0]).to.eql(exteriorRing[exteriorRing.length - 1]);
     });
   });
 
@@ -880,6 +929,33 @@ describe('ol.interaction.Modify', function () {
         done();
       }, 0);
     });
+
+    it('does not fire `modifyend` when nothing is modified', function (done) {
+      const modify = new Modify({
+        features: new Collection(features),
+        deleteCondition: click,
+        insertVertexCondition: never,
+      });
+      map.addInteraction(modify);
+
+      let modifyend = false;
+      modify.on('modifyend', function (e) {
+        modifyend = true;
+      });
+
+      // try to add vertex
+      simulateEvent('pointermove', 40, -20, null, 0);
+      simulateEvent('pointerdown', 40, -20, null, 0);
+      simulateEvent('pointerdrag', 42, -30, null, 0);
+      simulateEvent('pointerup', 42, -30, null, 0);
+      simulateEvent('click', 42, -30, null, 0);
+      simulateEvent('singleclick', 42, -30, null, 0);
+
+      setTimeout(function () {
+        expect(modifyend).to.be(false);
+        done();
+      }, 0);
+    });
   });
 
   describe('handle feature change', function () {
@@ -888,9 +964,9 @@ describe('ol.interaction.Modify', function () {
     beforeEach(function () {
       getModifyListeners = function (feature, modify) {
         const listeners = feature.listeners_['change'];
-        const candidates = getValues(modify);
+        const candidates = Object.values(modify);
         return listeners.filter(function (listener) {
-          return candidates.indexOf(listener) !== -1;
+          return candidates.includes(listener);
         });
       };
     });

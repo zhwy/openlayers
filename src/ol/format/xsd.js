@@ -21,9 +21,8 @@ export function readBooleanString(string) {
   const m = /^\s*(true|1)|(false|0)\s*$/.exec(string);
   if (m) {
     return m[1] !== undefined || false;
-  } else {
-    return undefined;
   }
+  return undefined;
 }
 
 /**
@@ -54,16 +53,15 @@ export function readDecimalString(string) {
   const m = /^\s*([+\-]?\d*\.?\d+(?:e[+\-]?\d+)?)\s*$/i.exec(string);
   if (m) {
     return parseFloat(m[1]);
-  } else {
-    return undefined;
   }
+  return undefined;
 }
 
 /**
  * @param {Node} node Node.
  * @return {number|undefined} Non negative integer.
  */
-export function readNonNegativeInteger(node) {
+export function readPositiveInteger(node) {
   const s = getAllTextContent(node, false);
   return readNonNegativeIntegerString(s);
 }
@@ -76,9 +74,8 @@ export function readNonNegativeIntegerString(string) {
   const m = /^\s*(\d+)\s*$/.exec(string);
   if (m) {
     return parseInt(m[1], 10);
-  } else {
-    return undefined;
   }
+  return undefined;
 }
 
 /**

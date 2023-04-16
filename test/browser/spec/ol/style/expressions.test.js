@@ -10,7 +10,7 @@ import {
   uniformNameForVariable,
 } from '../../../../../src/ol/style/expressions.js';
 
-describe('ol.style.expressions', function () {
+describe('ol/style/expressions', function () {
   describe('numberToGlsl', function () {
     it('does a simple transform when a fraction is present', function () {
       expect(numberToGlsl(1.3456)).to.eql('1.3456');
@@ -70,6 +70,7 @@ describe('ol.style.expressions', function () {
     beforeEach(function () {
       context = {
         stringLiteralsMap: {},
+        functions: {},
       };
     });
 
@@ -207,6 +208,7 @@ describe('ol.style.expressions', function () {
         variables: [],
         attributes: [],
         stringLiteralsMap: {},
+        functions: {},
       };
     });
 
@@ -218,6 +220,14 @@ describe('ol.style.expressions', function () {
       expect(expressionToGlsl(context, ['time'])).to.eql('u_time');
       expect(expressionToGlsl(context, ['zoom'])).to.eql('u_zoom');
       expect(expressionToGlsl(context, ['resolution'])).to.eql('u_resolution');
+
+      expect(expressionToGlsl(context, ['+', 1, 2, 3, 4])).to.eql(
+        '(1.0 + 2.0 + 3.0 + 4.0)'
+      );
+      expect(expressionToGlsl(context, ['*', 1, 2, 3, 4])).to.eql(
+        '(1.0 * 2.0 * 3.0 * 4.0)'
+      );
+
       expect(
         expressionToGlsl(context, ['+', ['*', ['get', 'size'], 0.001], 12])
       ).to.eql('((a_size * 0.001) + 12.0)');
@@ -241,6 +251,11 @@ describe('ol.style.expressions', function () {
           ['-', ['get', 'attr3'], ['get', 'attr2']],
         ])
       ).to.eql('abs((a_attr3 - a_attr2))');
+      expect(expressionToGlsl(context, ['floor', 1])).to.eql('floor(1.0)');
+      expect(expressionToGlsl(context, ['round', 1])).to.eql(
+        'floor(1.0 + 0.5)'
+      );
+      expect(expressionToGlsl(context, ['ceil', 1])).to.eql('ceil(1.0)');
       expect(expressionToGlsl(context, ['sin', 1])).to.eql('sin(1.0)');
       expect(expressionToGlsl(context, ['cos', 1])).to.eql('cos(1.0)');
       expect(expressionToGlsl(context, ['atan', 1])).to.eql('atan(1.0)');
@@ -289,9 +304,11 @@ describe('ol.style.expressions', function () {
       expect(
         expressionToGlsl(context, ['color', ['get', 'attr4'], 1, 2, 0.5])
       ).to.eql('vec4(a_attr4 / 255.0, 1.0 / 255.0, 2.0 / 255.0, 0.5)');
-      expect(expressionToGlsl(context, ['band', 1])).to.eql('color0[0]');
+      expect(expressionToGlsl(context, ['band', 1])).to.eql(
+        'getBandValue(1.0, 0.0, 0.0)'
+      );
       expect(expressionToGlsl(context, ['band', 1, -1, 2])).to.eql(
-        'texture2D(u_tileTexture0, v_textureCoord + vec2(-1.0 / u_texturePixelWidth, 2.0 / u_texturePixelHeight))[0]'
+        'getBandValue(1.0, -1.0, 2.0)'
       );
     });
 
@@ -464,6 +481,7 @@ describe('ol.style.expressions', function () {
         variables: [],
         attributes: [],
         stringLiteralsMap: {},
+        functions: {},
       };
     });
 
@@ -608,6 +626,7 @@ describe('ol.style.expressions', function () {
         variables: [],
         attributes: [],
         stringLiteralsMap: {},
+        functions: {},
       };
     });
 
@@ -821,6 +840,7 @@ describe('ol.style.expressions', function () {
         variables: [],
         attributes: [],
         stringLiteralsMap: {},
+        functions: {},
       };
     });
 
@@ -1067,6 +1087,7 @@ describe('ol.style.expressions', function () {
         variables: [],
         attributes: [],
         stringLiteralsMap: {},
+        functions: {},
       };
     });
 

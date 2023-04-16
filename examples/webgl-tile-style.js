@@ -22,7 +22,6 @@ const layer = new TileLayer({
     variables: variables,
   },
   source: new XYZ({
-    crossOrigin: 'anonymous', // TODO: determine if we can avoid this
     attributions: attributions,
     url: 'https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=' + key,
     maxZoom: 20,
@@ -38,16 +37,16 @@ const map = new Map({
   }),
 });
 
-for (const name in variables) {
+let variable;
+for (variable in variables) {
+  const name = variable;
   const element = document.getElementById(name);
   const value = variables[name];
   element.value = value.toString();
-  document.getElementById(`${name}-value`).innerText = `(${value})`;
-
+  document.getElementById(name + '-value').innerText = value.toFixed(2);
   element.addEventListener('input', function (event) {
     const value = parseFloat(event.target.value);
-    document.getElementById(`${name}-value`).innerText = `(${value})`;
-
+    document.getElementById(name + '-value').innerText = value.toFixed(2);
     const updates = {};
     updates[name] = value;
     layer.updateStyleVariables(updates);

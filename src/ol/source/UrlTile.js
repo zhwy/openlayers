@@ -15,7 +15,7 @@ import {getUid} from '../util.js';
  * @property {number} [cacheSize] Cache size.
  * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection.
- * @property {import("./State.js").default} [state] State.
+ * @property {import("./Source.js").State} [state] State.
  * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] TileGrid.
  * @property {import("../Tile.js").LoadFunction} tileLoadFunction TileLoadFunction.
  * @property {number} [tilePixelRatio] TilePixelRatio.
@@ -26,6 +26,8 @@ import {getUid} from '../util.js';
  * @property {number} [transition] Transition.
  * @property {string} [key] Key.
  * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0] ZDirection.
+ * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
+ * the nearest neighbor is used when resampling.
  */
 
 /**
@@ -49,6 +51,7 @@ class UrlTile extends TileSource {
       tilePixelRatio: options.tilePixelRatio,
       wrapX: options.wrapX,
       transition: options.transition,
+      interpolate: options.interpolate,
       key: options.key,
       attributionsCollapsible: options.attributionsCollapsible,
       zDirection: options.zDirection,

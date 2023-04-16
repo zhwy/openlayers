@@ -4,7 +4,6 @@
 
 import EventType from '../events/EventType.js';
 import Feature from '../Feature.js';
-import GeometryType from '../geom/GeometryType.js';
 import Point from '../geom/Point.js';
 import VectorSource from './Vector.js';
 import {add as addCoordinate, scale as scaleCoordinate} from '../coordinate.js';
@@ -28,8 +27,8 @@ import {getUid} from '../util.js';
  * overlapping icons. As a tradoff, the cluster feature's position will no longer be
  * the center of all its features.
  * @property {function(Feature):Point} [geometryFunction]
- * Function that takes an {@link module:ol/Feature} as argument and returns an
- * {@link module:ol/geom/Point} as cluster calculation point for the feature. When a
+ * Function that takes an {@link module:ol/Feature~Feature} as argument and returns an
+ * {@link module:ol/geom/Point~Point} as cluster calculation point for the feature. When a
  * feature should not be considered for clustering, the function should return
  * `null`. The default, which works when the underlying source contains point
  * features only, is
@@ -41,9 +40,9 @@ import {getUid} from '../util.js';
  * See {@link module:ol/geom/Polygon~Polygon#getInteriorPoint} for a way to get a cluster
  * calculation point for polygons.
  * @property {function(Point, Array<Feature>):Feature} [createCluster]
- * Function that takes the cluster's center {@link module:ol/geom/Point} and an array
- * of {@link module:ol/Feature} included in this cluster. Must return a
- * {@link module:ol/Feature} that will be used to render. Default implementation is:
+ * Function that takes the cluster's center {@link module:ol/geom/Point~Point} and an array
+ * of {@link module:ol/Feature~Feature} included in this cluster. Must return a
+ * {@link module:ol/Feature~Feature} that will be used to render. Default implementation is:
  * ```js
  * function(point, features) {
  *   return new Feature({
@@ -52,7 +51,7 @@ import {getUid} from '../util.js';
  *   });
  * }
  * ```
- * @property {VectorSource} [source] Source.
+ * @property {VectorSource} [source=null] Source.
  * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
  */
 
@@ -115,8 +114,8 @@ class Cluster extends VectorSource {
     this.geometryFunction =
       options.geometryFunction ||
       function (feature) {
-        const geometry = feature.getGeometry();
-        assert(geometry.getType() == GeometryType.POINT, 10); // The default `geometryFunction` can only handle `Point` geometries
+        const geometry = /** @type {Point} */ (feature.getGeometry());
+        assert(geometry.getType() == 'Point', 10); // The default `geometryFunction` can only handle `Point` geometries
         return geometry;
       };
 
@@ -127,11 +126,14 @@ class Cluster extends VectorSource {
     this.createCustomCluster_ = options.createCluster;
 
     /**
-     * @type {VectorSource}
+     * @type {VectorSource|null}
      * @protected
      */
     this.source = null;
 
+    /**
+     * @private
+     */
     this.boundRefresh_ = this.refresh.bind(this);
 
     this.updateDistance(this.distance, this.minDistance);
@@ -140,12 +142,12 @@ class Cluster extends VectorSource {
 
   /**
    * Remove all features from the source.
-   * @param {boolean} [opt_fast] Skip dispatching of {@link module:ol/source/Vector.VectorSourceEvent#removefeature} events.
+   * @param {boolean} [fast] Skip dispatching of {@link module:ol/source/VectorEventType~VectorEventType#removefeature} events.
    * @api
    */
-  clear(opt_fast) {
+  clear(fast) {
     this.features.length = 0;
-    super.clear(opt_fast);
+    super.clear(fast);
   }
 
   /**
@@ -159,7 +161,7 @@ class Cluster extends VectorSource {
 
   /**
    * Get a reference to the wrapped source.
-   * @return {VectorSource} Source.
+   * @return {VectorSource|null} Source.
    * @api
    */
   getSource() {
@@ -209,7 +211,7 @@ class Cluster extends VectorSource {
 
   /**
    * Replace the wrapped source.
-   * @param {VectorSource} source The new source for this instance.
+   * @param {VectorSource|null} source The new source for this instance.
    * @api
    */
   setSource(source) {
@@ -314,12 +316,11 @@ class Cluster extends VectorSource {
     ]);
     if (this.createCustomCluster_) {
       return this.createCustomCluster_(geometry, features);
-    } else {
-      return new Feature({
-        geometry,
-        features,
-      });
     }
+    return new Feature({
+      geometry,
+      features,
+    });
   }
 }
 

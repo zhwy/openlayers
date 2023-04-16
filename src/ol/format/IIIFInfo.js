@@ -3,7 +3,6 @@
  */
 
 import {assert} from '../asserts.js';
-import {includes} from '../array.js';
 
 /**
  * @typedef {Object} PreferredOptions
@@ -40,7 +39,7 @@ import {includes} from '../array.js';
  */
 
 /**
- * @typedef {Object<string,string|number|Array<number|string|IiifProfile>|Object<string, number>|TileInfo>}
+ * @typedef {Object<string,string|number|Array<number|string|IiifProfile|Object<string, number>|TileInfo>>}
  *    ImageInformationResponse
  */
 
@@ -249,10 +248,10 @@ function generateVersion3Options(iiifInfo) {
       iiifInfo.imageInfo.preferredFormats.length > 0
         ? iiifInfo.imageInfo.preferredFormats
             .filter(function (format) {
-              return includes(['jpg', 'png', 'gif'], format);
+              return ['jpg', 'png', 'gif'].includes(format);
             })
             .reduce(function (acc, format) {
-              return acc === undefined && includes(formats, format)
+              return acc === undefined && formats.includes(format)
                 ? format
                 : acc;
             }, undefined)
@@ -438,12 +437,12 @@ class IIIFInfo {
   }
 
   /**
-   * @param {PreferredOptions} [opt_preferredOptions] Optional options for preferred format and quality.
+   * @param {PreferredOptions} [preferredOptions] Optional options for preferred format and quality.
    * @return {import("../source/IIIF.js").Options} IIIF tile source ready constructor options.
    * @api
    */
-  getTileSourceOptions(opt_preferredOptions) {
-    const options = opt_preferredOptions || {},
+  getTileSourceOptions(preferredOptions) {
+    const options = preferredOptions || {},
       version = this.getImageApiVersion();
     if (version === undefined) {
       return;
@@ -460,16 +459,16 @@ class IIIFInfo {
       sizes: imageOptions.sizes,
       format:
         options.format !== undefined &&
-        includes(imageOptions.formats, options.format)
+        imageOptions.formats.includes(options.format)
           ? options.format
           : imageOptions.preferredFormat !== undefined
           ? imageOptions.preferredFormat
           : 'jpg',
       supports: imageOptions.supports,
       quality:
-        options.quality && includes(imageOptions.qualities, options.quality)
+        options.quality && imageOptions.qualities.includes(options.quality)
           ? options.quality
-          : includes(imageOptions.qualities, 'native')
+          : imageOptions.qualities.includes('native')
           ? 'native'
           : 'default',
       resolutions: Array.isArray(imageOptions.resolutions)

@@ -17,11 +17,8 @@ function elevation(xOffset, yOffset) {
   return [
     '+',
     ['*', 256, ['band', 1, xOffset, yOffset]],
-    [
-      '+',
-      ['*', 2 * 256, ['band', 2, xOffset, yOffset]],
-      ['*', 3 * 256, ['band', 3, xOffset, yOffset]],
-    ],
+    ['*', 2 * 256, ['band', 2, xOffset, yOffset]],
+    ['*', 3 * 256, ['band', 3, xOffset, yOffset]],
   ];
 }
 
@@ -50,7 +47,6 @@ const shadedRelief = new TileLayer({
   opacity: 0.3,
   source: new XYZ({
     url: 'https://{a-d}.tiles.mapbox.com/v3/aj.sf-dem/{z}/{x}/{y}.png',
-    crossOrigin: 'anonymous',
   }),
   style: {
     variables: variables,
@@ -67,7 +63,7 @@ controlIds.forEach(function (id) {
     variables[id] = Number(control.value);
   }
   updateValues();
-  control.addEventListener('input', () => {
+  control.addEventListener('input', function () {
     updateValues();
     shadedRelief.updateStyleVariables(variables);
   });

@@ -13,7 +13,8 @@ import {createXYZ, extentFromProjection} from '../tilegrid.js';
  * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
  * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
  * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
  * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Projection.
  * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
@@ -34,6 +35,9 @@ import {createXYZ, extentFromProjection} from '../tilegrid.js';
  * should be set to `2`.
  * @property {number|import("../size.js").Size} [tileSize=[256, 256]] The tile size used by the tile service.
  * Not used if `tileGrid` is provided.
+ * @property {number} [gutter=0] The size in pixels of the gutter around image tiles to ignore.
+ * This allows artifacts of rendering at tile edges to be ignored.
+ * Supported images should be wider and taller than the tile size by a value of `2 x gutter`.
  * @property {import("../Tile.js").UrlFunction} [tileUrlFunction] Optional function to get
  * tile URL given a tile coordinate and the projection.
  * Required if `url` or `urls` are not provided.
@@ -68,10 +72,11 @@ import {createXYZ, extentFromProjection} from '../tilegrid.js';
  */
 class XYZ extends TileImage {
   /**
-   * @param {Options} [opt_options] XYZ options.
+   * @param {Options} [options] XYZ options.
    */
-  constructor(opt_options) {
-    const options = opt_options || {};
+  constructor(options) {
+    options = options || {};
+
     const projection =
       options.projection !== undefined ? options.projection : 'EPSG:3857';
 
@@ -90,7 +95,7 @@ class XYZ extends TileImage {
       attributions: options.attributions,
       cacheSize: options.cacheSize,
       crossOrigin: options.crossOrigin,
-      imageSmoothing: options.imageSmoothing,
+      interpolate: options.interpolate,
       opaque: options.opaque,
       projection: projection,
       reprojectionErrorThreshold: options.reprojectionErrorThreshold,
@@ -105,6 +110,19 @@ class XYZ extends TileImage {
       attributionsCollapsible: options.attributionsCollapsible,
       zDirection: options.zDirection,
     });
+
+    /**
+     * @private
+     * @type {number}
+     */
+    this.gutter_ = options.gutter !== undefined ? options.gutter : 0;
+  }
+
+  /**
+   * @return {number} Gutter.
+   */
+  getGutter() {
+    return this.gutter_;
   }
 }
 

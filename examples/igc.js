@@ -179,8 +179,9 @@ const featureOverlay = new VectorLayer({
   }),
 });
 
-document.getElementById('time').addEventListener('input', function () {
-  const value = parseInt(this.value, 10) / 100;
+const control = document.getElementById('time');
+control.addEventListener('input', function () {
+  const value = parseInt(control.value, 10) / 100;
   const m = time.start + time.duration * value;
   vectorSource.forEachFeature(function (feature) {
     const geometry =

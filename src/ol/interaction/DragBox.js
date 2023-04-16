@@ -8,7 +8,7 @@ import RenderBox from '../render/Box.js';
 import {mouseActionButton} from '../events/condition.js';
 
 /**
- * A function that takes a {@link module:ol/MapBrowserEvent} and two
+ * A function that takes a {@link module:ol/MapBrowserEvent~MapBrowserEvent} and two
  * {@link module:ol/pixel~Pixel}s and returns a `{boolean}`. If the condition is met,
  * true should be returned.
  * @typedef {function(this: ?, import("../MapBrowserEvent.js").default, import("../pixel.js").Pixel, import("../pixel.js").Pixel):boolean} EndCondition
@@ -98,7 +98,7 @@ export class DragBoxEvent extends Event {
  * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes, import("../events/Event.js").default, Return> &
  *   import("../Observable").OnSignature<import("../ObjectEventType").Types|
  *     'change:active', import("../Object").ObjectEvent, Return> &
- *   import("../Observable").OnSignature<'boxcancel'|'boxdrag'|'boxend', DragBoxEvent, Return> &
+ *   import("../Observable").OnSignature<'boxcancel'|'boxdrag'|'boxend'|'boxstart', DragBoxEvent, Return> &
  *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|import("../ObjectEventType").Types|
  *     'change:active'|'boxcancel'|'boxdrag'|'boxend', Return>} DragBoxOnSignature
  */
@@ -110,25 +110,25 @@ export class DragBoxEvent extends Event {
  * it to when the shift or other key is held down. This is used, for example,
  * for zooming to a specific area of the map
  * (see {@link module:ol/interaction/DragZoom~DragZoom} and
- * {@link module:ol/interaction/DragRotateAndZoom}).
+ * {@link module:ol/interaction/DragRotateAndZoom~DragRotateAndZoom}).
  *
  * @fires DragBoxEvent
  * @api
  */
 class DragBox extends PointerInteraction {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
+  constructor(options) {
     super();
 
     /***
-     * @type {DragBoxOnSignature<import("../Observable").OnReturn>}
+     * @type {DragBoxOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {DragBoxOnSignature<import("../Observable").OnReturn>}
+     * @type {DragBoxOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -137,7 +137,7 @@ class DragBox extends PointerInteraction {
      */
     this.un;
 
-    const options = opt_options ? opt_options : {};
+    options = options ? options : {};
 
     /**
      * @type {import("../render/Box.js").default}
@@ -260,9 +260,8 @@ class DragBox extends PointerInteraction {
         )
       );
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
 
   /**

@@ -4,8 +4,7 @@ import Fill from '../../../../../src/ol/style/Fill.js';
 import GeoJSON from '../../../../../src/ol/format/GeoJSON.js';
 import GeometryCollection from '../../../../../src/ol/geom/GeometryCollection.js';
 import Icon from '../../../../../src/ol/style/Icon.js';
-import IconAnchorUnits from '../../../../../src/ol/style/IconAnchorUnits.js';
-import IconOrigin from '../../../../../src/ol/style/IconOrigin.js';
+import ImageState from '../../../../../src/ol/ImageState.js';
 import KML, {
   getDefaultFillStyle,
   getDefaultImageStyle,
@@ -32,7 +31,6 @@ import {
   get as getProjection,
   transform,
 } from '../../../../../src/ol/proj.js';
-import {find} from '../../../../../src/ol/array.js';
 import {parse} from '../../../../../src/ol/xml.js';
 import {remove as removeTransform} from '../../../../../src/ol/proj/transforms.js';
 
@@ -2299,6 +2297,58 @@ describe('ol.format.KML', function () {
           expect(style.getZIndex()).to.be(undefined);
         });
 
+        it("can read a feature's IconStyle, load the image and reset the scale", function (done) {
+          format = new KML({
+            iconUrlFunction: function (href) {
+              return href.replace('http://foo/', 'spec/ol/data/');
+            },
+          });
+          const text =
+            '<kml xmlns="http://earth.google.com/kml/2.2">' +
+            '  <Placemark>' +
+            '    <Style>' +
+            '      <IconStyle>' +
+            '        <Icon>' +
+            '          <href>http://foo/dot.png</href>' +
+            '        </Icon>' +
+            '      </IconStyle>' +
+            '    </Style>' +
+            '  </Placemark>' +
+            '</kml>';
+          const fs = format.readFeatures(text);
+          expect(fs).to.have.length(1);
+          const f = fs[0];
+          expect(f).to.be.an(Feature);
+          const styleFunction = f.getStyleFunction();
+          expect(styleFunction).not.to.be(undefined);
+          const styleArray = /** @type {Array<Style>} */ (styleFunction(f, 0));
+          expect(styleArray).to.be.an(Array);
+          expect(styleArray).to.have.length(1);
+          const style = styleArray[0];
+          expect(style).to.be.an(Style);
+          expect(style.getFill()).to.be(getDefaultFillStyle());
+          expect(style.getStroke()).to.be(getDefaultStrokeStyle());
+          const imageStyle = style.getImage();
+          expect(imageStyle).to.be.an(Icon);
+          expect(imageStyle.getSrc()).to.eql('spec/ol/data/dot.png');
+          expect(imageStyle.getAnchor()).to.be(null);
+          expect(imageStyle.getOrigin()).to.be(null);
+          expect(imageStyle.getRotation()).to.eql(0);
+          expect(imageStyle.getSize()).to.be(null);
+          expect(imageStyle.getScale()).to.be(1);
+          expect(imageStyle.getImage().crossOrigin).to.eql('anonymous');
+          expect(style.getText()).to.be(getDefaultTextStyle());
+          expect(style.getZIndex()).to.be(undefined);
+
+          imageStyle.listenImageChange(function (evt) {
+            if (imageStyle.getImageState() === ImageState.LOADED) {
+              expect(imageStyle.getSize()).to.eql([20, 20]);
+              expect(imageStyle.getScale()).to.be(1.6); // 32 / 20
+              done();
+            }
+          });
+        });
+
         it("can read a IconStyle's hotspot", function () {
           const text =
             '<kml xmlns="http://earth.google.com/kml/2.2">' +
@@ -2377,25 +2427,25 @@ describe('ol.format.KML', function () {
             if (f.getId() == 1) {
               expect(imageStyle.anchor_[0]).to.be(0.5);
               expect(imageStyle.anchor_[1]).to.be(0.5);
-              expect(imageStyle.anchorOrigin_).to.be(IconOrigin.BOTTOM_LEFT);
-              expect(imageStyle.anchorXUnits_).to.be(IconAnchorUnits.FRACTION);
-              expect(imageStyle.anchorYUnits_).to.be(IconAnchorUnits.FRACTION);
+              expect(imageStyle.anchorOrigin_).to.be('bottom-left');
+              expect(imageStyle.anchorXUnits_).to.be('fraction');
+              expect(imageStyle.anchorYUnits_).to.be('fraction');
             } else {
               expect(imageStyle.anchor_[0]).to.be(5);
               expect(imageStyle.anchor_[1]).to.be(5);
-              expect(imageStyle.anchorXUnits_).to.be(IconAnchorUnits.PIXELS);
-              expect(imageStyle.anchorYUnits_).to.be(IconAnchorUnits.PIXELS);
+              expect(imageStyle.anchorXUnits_).to.be('pixels');
+              expect(imageStyle.anchorYUnits_).to.be('pixels');
               if (f.getId() == 2) {
-                expect(imageStyle.anchorOrigin_).to.be(IconOrigin.BOTTOM_LEFT);
+                expect(imageStyle.anchorOrigin_).to.be('bottom-left');
               }
               if (f.getId() == 3) {
-                expect(imageStyle.anchorOrigin_).to.be(IconOrigin.BOTTOM_RIGHT);
+                expect(imageStyle.anchorOrigin_).to.be('bottom-right');
               }
               if (f.getId() == 4) {
-                expect(imageStyle.anchorOrigin_).to.be(IconOrigin.TOP_LEFT);
+                expect(imageStyle.anchorOrigin_).to.be('top-left');
               }
               if (f.getId() == 5) {
-                expect(imageStyle.anchorOrigin_).to.be(IconOrigin.TOP_RIGHT);
+                expect(imageStyle.anchorOrigin_).to.be('top-right');
               }
             }
             expect(imageStyle.getRotation()).to.eql(0);
@@ -2446,7 +2496,7 @@ describe('ol.format.KML', function () {
           expect(imageStyle.getAnchor()).to.eql([24, 36]);
           expect(imageStyle.getOrigin()).to.eql([24, 108]);
           expect(imageStyle.getRotation()).to.eql(0);
-          expect(imageStyle.getScale()).to.eql(3.0);
+          expect(imageStyle.getScale()).to.eql(2.0); // 3.0 * 32 / 48
           expect(style.getText()).to.be(getDefaultTextStyle());
           expect(style.getZIndex()).to.be(undefined);
         });
@@ -3027,7 +3077,7 @@ describe('ol.format.KML', function () {
             '  <Placemark>' +
             '    <Style>' +
             '      <IconStyle>' +
-            '        <scale>0.5</scale>' +
+            '        <scale>0.75</scale>' + // 0.5 * 48 / 32
             '        <heading>45</heading>' +
             '        <Icon>' +
             '          <href>http://foo.png</href>' +
@@ -4205,7 +4255,7 @@ describe('ol.format.KML', function () {
       });
 
       it('creates a Point and a MultiPolygon for Alaska', function () {
-        const alaska = find(features, function (feature) {
+        const alaska = features.find(function (feature) {
           return feature.get('name') === 'Alaska';
         });
         expect(alaska).to.be.an(Feature);

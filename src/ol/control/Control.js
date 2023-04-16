@@ -30,7 +30,7 @@ import {removeNode} from '../dom.js';
  * This is the base class for controls. You can use it for simple custom
  * controls by creating the element with listeners, creating an instance:
  * ```js
- * var myControl = new Control({element: myElement});
+ * const myControl = new Control({element: myElement});
  * ```
  * and then adding this to the map.
  *
@@ -69,7 +69,7 @@ class Control extends BaseObject {
 
     /**
      * @private
-     * @type {import("../PluggableMap.js").default}
+     * @type {import("../Map.js").default|null}
      */
     this.map_ = null;
 
@@ -98,7 +98,7 @@ class Control extends BaseObject {
 
   /**
    * Get the map associated with this control.
-   * @return {import("../PluggableMap.js").default} Map.
+   * @return {import("../Map.js").default|null} Map.
    * @api
    */
   getMap() {
@@ -107,9 +107,10 @@ class Control extends BaseObject {
 
   /**
    * Remove the control from its current map and attach it to the new map.
+   * Pass `null` to just remove the control from the current map.
    * Subclasses may set up event handlers to get notified about changes to
    * the map here.
-   * @param {import("../PluggableMap.js").default} map Map.
+   * @param {import("../Map.js").default|null} map Map.
    * @api
    */
   setMap(map) {
@@ -121,7 +122,7 @@ class Control extends BaseObject {
     }
     this.listenerKeys.length = 0;
     this.map_ = map;
-    if (this.map_) {
+    if (map) {
       const target = this.target_
         ? this.target_
         : map.getOverlayContainerStopEvent();

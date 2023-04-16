@@ -3,8 +3,9 @@
  */
 import Control from './Control.js';
 import EventType from '../events/EventType.js';
+import MapProperty from '../MapProperty.js';
 import {CLASS_CONTROL, CLASS_UNSELECTABLE, CLASS_UNSUPPORTED} from '../css.js';
-import {listen} from '../events.js';
+import {listen, unlistenByKey} from '../events.js';
 import {replaceNode} from '../dom.js';
 
 const events = [
@@ -44,15 +45,15 @@ const FullScreenEventType = {
 /**
  * @typedef {Object} Options
  * @property {string} [className='ol-full-screen'] CSS class name.
- * @property {string|Text} [label='\u2922'] Text label to use for the button.
+ * @property {string|Text|HTMLElement} [label='\u2922'] Text label to use for the button.
  * Instead of text, also an element (e.g. a `span` element) can be used.
- * @property {string|Text} [labelActive='\u00d7'] Text label to use for the
+ * @property {string|Text|HTMLElement} [labelActive='\u00d7'] Text label to use for the
  * button when full-screen is active.
+ * Instead of text, also an element (e.g. a `span` element) can be used.
  * @property {string} [activeClassName=className + '-true'] CSS class name for the button
  * when full-screen is active.
  * @property {string} [inactiveClassName=className + '-false'] CSS class name for the button
  * when full-screen is inactive.
- * Instead of text, also an element (e.g. a `span` element) can be used.
  * @property {string} [tipLabel='Toggle full-screen'] Text label to use for the button tip.
  * @property {boolean} [keys=false] Full keyboard access.
  * @property {HTMLElement|string} [target] Specify a target if you want the
@@ -79,10 +80,10 @@ const FullScreenEventType = {
  */
 class FullScreen extends Control {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     super({
       element: document.createElement('div'),
@@ -90,12 +91,12 @@ class FullScreen extends Control {
     });
 
     /***
-     * @type {FullScreenOnSignature<import("../Observable.js").OnReturn>}
+     * @type {FullScreenOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {FullScreenOnSignature<import("../Observable.js").OnReturn>}
+     * @type {FullScreenOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -106,10 +107,39 @@ class FullScreen extends Control {
 
     /**
      * @private
+     * @type {boolean}
+     */
+    this.keys_ = options.keys !== undefined ? options.keys : false;
+
+    /**
+     * @private
+     * @type {HTMLElement|string|undefined}
+     */
+    this.source_ = options.source;
+
+    /**
+     * @type {boolean}
+     * @private
+     */
+    this.isInFullscreen_ = false;
+
+    /**
+     * @private
+     */
+    this.boundHandleMapTargetChange_ = this.handleMapTargetChange_.bind(this);
+
+    /**
+     * @private
      * @type {string}
      */
     this.cssClassName_ =
       options.className !== undefined ? options.className : 'ol-full-screen';
+
+    /**
+     * @private
+     * @type {Array<import("../events.js").EventsKey>}
+     */
+    this.documentListeners_ = [];
 
     /**
      * @private
@@ -133,7 +163,7 @@ class FullScreen extends Control {
 
     /**
      * @private
-     * @type {Text}
+     * @type {Text|HTMLElement}
      */
     this.labelNode_ =
       typeof label === 'string' ? document.createTextNode(label) : label;
@@ -143,54 +173,32 @@ class FullScreen extends Control {
 
     /**
      * @private
-     * @type {Text}
+     * @type {Text|HTMLElement}
      */
     this.labelActiveNode_ =
       typeof labelActive === 'string'
         ? document.createTextNode(labelActive)
         : labelActive;
 
+    const tipLabel = options.tipLabel ? options.tipLabel : 'Toggle full-screen';
+
     /**
      * @private
      * @type {HTMLElement}
      */
     this.button_ = document.createElement('button');
-
-    const tipLabel = options.tipLabel ? options.tipLabel : 'Toggle full-screen';
-    this.setClassName_(this.button_, isFullScreen());
-    this.button_.setAttribute('type', 'button');
     this.button_.title = tipLabel;
+    this.button_.setAttribute('type', 'button');
     this.button_.appendChild(this.labelNode_);
-
     this.button_.addEventListener(
       EventType.CLICK,
       this.handleClick_.bind(this),
       false
     );
+    this.setClassName_(this.button_, this.isInFullscreen_);
 
-    const cssClasses =
-      this.cssClassName_ +
-      ' ' +
-      CLASS_UNSELECTABLE +
-      ' ' +
-      CLASS_CONTROL +
-      ' ' +
-      (!isFullScreenSupported() ? CLASS_UNSUPPORTED : '');
-    const element = this.element;
-    element.className = cssClasses;
-    element.appendChild(this.button_);
-
-    /**
-     * @private
-     * @type {boolean}
-     */
-    this.keys_ = options.keys !== undefined ? options.keys : false;
-
-    /**
-     * @private
-     * @type {HTMLElement|string|undefined}
-     */
-    this.source_ = options.source;
+    this.element.className = `${this.cssClassName_} ${CLASS_UNSELECTABLE} ${CLASS_CONTROL}`;
+    this.element.appendChild(this.button_);
   }
 
   /**
@@ -206,21 +214,22 @@ class FullScreen extends Control {
    * @private
    */
   handleFullScreen_() {
-    if (!isFullScreenSupported()) {
-      return;
-    }
     const map = this.getMap();
     if (!map) {
       return;
     }
-    if (isFullScreen()) {
-      exitFullScreen();
+    const doc = map.getOwnerDocument();
+    if (!isFullScreenSupported(doc)) {
+      return;
+    }
+    if (isFullScreen(doc)) {
+      exitFullScreen(doc);
     } else {
       let element;
       if (this.source_) {
         element =
           typeof this.source_ === 'string'
-            ? document.getElementById(this.source_)
+            ? doc.getElementById(this.source_)
             : this.source_;
       } else {
         element = map.getTargetElement();
@@ -238,16 +247,20 @@ class FullScreen extends Control {
    */
   handleFullScreenChange_() {
     const map = this.getMap();
-    if (isFullScreen()) {
-      this.setClassName_(this.button_, true);
-      replaceNode(this.labelActiveNode_, this.labelNode_);
-      this.dispatchEvent(FullScreenEventType.ENTERFULLSCREEN);
-    } else {
-      this.setClassName_(this.button_, false);
-      replaceNode(this.labelNode_, this.labelActiveNode_);
-      this.dispatchEvent(FullScreenEventType.LEAVEFULLSCREEN);
+    if (!map) {
+      return;
     }
-    if (map) {
+    const wasInFullscreen = this.isInFullscreen_;
+    this.isInFullscreen_ = isFullScreen(map.getOwnerDocument());
+    if (wasInFullscreen !== this.isInFullscreen_) {
+      this.setClassName_(this.button_, this.isInFullscreen_);
+      if (this.isInFullscreen_) {
+        replaceNode(this.labelActiveNode_, this.labelNode_);
+        this.dispatchEvent(FullScreenEventType.ENTERFULLSCREEN);
+      } else {
+        replaceNode(this.labelNode_, this.labelActiveNode_);
+        this.dispatchEvent(FullScreenEventType.LEAVEFULLSCREEN);
+      }
       map.updateSize();
     }
   }
@@ -258,54 +271,90 @@ class FullScreen extends Control {
    * @private
    */
   setClassName_(element, fullscreen) {
-    const activeClassName = this.activeClassName_;
-    const inactiveClassName = this.inactiveClassName_;
-    const nextClassName = fullscreen ? activeClassName : inactiveClassName;
-    element.classList.remove(...activeClassName);
-    element.classList.remove(...inactiveClassName);
-    element.classList.add(...nextClassName);
+    if (fullscreen) {
+      element.classList.remove(...this.inactiveClassName_);
+      element.classList.add(...this.activeClassName_);
+    } else {
+      element.classList.remove(...this.activeClassName_);
+      element.classList.add(...this.inactiveClassName_);
+    }
   }
 
   /**
    * Remove the control from its current map and attach it to the new map.
+   * Pass `null` to just remove the control from the current map.
    * Subclasses may set up event handlers to get notified about changes to
    * the map here.
-   * @param {import("../PluggableMap.js").default} map Map.
+   * @param {import("../Map.js").default|null} map Map.
    * @api
    */
   setMap(map) {
+    const oldMap = this.getMap();
+    if (oldMap) {
+      oldMap.removeChangeListener(
+        MapProperty.TARGET,
+        this.boundHandleMapTargetChange_
+      );
+    }
+
     super.setMap(map);
+
+    this.handleMapTargetChange_();
     if (map) {
+      map.addChangeListener(
+        MapProperty.TARGET,
+        this.boundHandleMapTargetChange_
+      );
+    }
+  }
+
+  /**
+   * @private
+   */
+  handleMapTargetChange_() {
+    const listeners = this.documentListeners_;
+    for (let i = 0, ii = listeners.length; i < ii; ++i) {
+      unlistenByKey(listeners[i]);
+    }
+    listeners.length = 0;
+
+    const map = this.getMap();
+    if (map) {
+      const doc = map.getOwnerDocument();
+      if (isFullScreenSupported(doc)) {
+        this.element.classList.remove(CLASS_UNSUPPORTED);
+      } else {
+        this.element.classList.add(CLASS_UNSUPPORTED);
+      }
+
       for (let i = 0, ii = events.length; i < ii; ++i) {
-        this.listenerKeys.push(
-          listen(document, events[i], this.handleFullScreenChange_, this)
+        listeners.push(
+          listen(doc, events[i], this.handleFullScreenChange_, this)
         );
       }
+      this.handleFullScreenChange_();
     }
   }
 }
 
 /**
+ * @param {Document} doc The root document to check.
  * @return {boolean} Fullscreen is supported by the current platform.
  */
-function isFullScreenSupported() {
-  const body = document.body;
+function isFullScreenSupported(doc) {
+  const body = doc.body;
   return !!(
     body['webkitRequestFullscreen'] ||
-    (body['msRequestFullscreen'] && document['msFullscreenEnabled']) ||
-    (body.requestFullscreen && document.fullscreenEnabled)
+    (body.requestFullscreen && doc.fullscreenEnabled)
   );
 }
 
 /**
+ * @param {Document} doc The root document to check.
  * @return {boolean} Element is currently in fullscreen.
  */
-function isFullScreen() {
-  return !!(
-    document['webkitIsFullScreen'] ||
-    document['msFullscreenElement'] ||
-    document.fullscreenElement
-  );
+function isFullScreen(doc) {
+  return !!(doc['webkitIsFullScreen'] || doc.fullscreenElement);
 }
 
 /**
@@ -315,8 +364,6 @@ function isFullScreen() {
 function requestFullScreen(element) {
   if (element.requestFullscreen) {
     element.requestFullscreen();
-  } else if (element['msRequestFullscreen']) {
-    element['msRequestFullscreen']();
   } else if (element['webkitRequestFullscreen']) {
     element['webkitRequestFullscreen']();
   }
@@ -336,14 +383,13 @@ function requestFullScreenWithKeys(element) {
 
 /**
  * Exit fullscreen.
+ * @param {Document} doc The document to exit fullscren from
  */
-function exitFullScreen() {
-  if (document.exitFullscreen) {
-    document.exitFullscreen();
-  } else if (document['msExitFullscreen']) {
-    document['msExitFullscreen']();
-  } else if (document['webkitExitFullscreen']) {
-    document['webkitExitFullscreen']();
+function exitFullScreen(doc) {
+  if (doc.exitFullscreen) {
+    doc.exitFullscreen();
+  } else if (doc['webkitExitFullscreen']) {
+    doc['webkitExitFullscreen']();
   }
 }
 

@@ -23,10 +23,10 @@ import Layer from './Layer.js';
  * visible.
  * @property {number} [maxZoom] The maximum view zoom level (inclusive) at which this layer will
  * be visible.
- * @property {import("../PluggableMap.js").default} [map] Sets the layer as overlay on a map. The map will not manage
+ * @property {import("../Map.js").default} [map] Sets the layer as overlay on a map. The map will not manage
  * this layer in its layers collection, and the layer will be rendered on top. This is useful for
  * temporary layers. The standard way to add a layer to a map and have it managed by the map is to
- * use {@link import("../PluggableMap.js").default#addLayer map.addLayer()}.
+ * use {@link import("../Map.js").default#addLayer map.addLayer()}.
  * @property {ImageSourceType} [source] Source for this layer.
  * @property {Object<string, *>} [properties] Arbitrary observable properties. Can be accessed with `#get()` and `#set()`.
  */
@@ -40,15 +40,16 @@ import Layer from './Layer.js';
  * options means that `title` is observable, and has get/set accessors.
  *
  * @template {import("../source/Image.js").default} ImageSourceType
- * @extends {Layer<ImageSourceType>}
+ * @template {import("../renderer/Layer.js").default} RendererType
+ * @extends {Layer<ImageSourceType, RendererType>}
  * @api
  */
 class BaseImageLayer extends Layer {
   /**
-   * @param {Options<ImageSourceType>} [opt_options] Layer options.
+   * @param {Options<ImageSourceType>} [options] Layer options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
     super(options);
   }
 }

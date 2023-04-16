@@ -5,13 +5,12 @@ import fs from 'fs';
 import path, {dirname} from 'path';
 import {fileURLToPath} from 'url';
 
-const baseDir = dirname(fileURLToPath(import.meta.url));
-
-const src = path.join(baseDir, '..');
+const src = path.join(dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.join(src, '..');
 
 export default {
   context: src,
-  target: ['web', 'es5'],
+  target: ['browserslist'],
   entry: () => {
     const entry = {};
     fs.readdirSync(src)
@@ -26,34 +25,11 @@ export default {
   module: {
     rules: [
       {
-        test: /^((?!es2015-)[\s\S])*\.js$/,
-        use: {
-          loader: 'buble-loader',
-          options: {
-            transforms: {
-              dangerousForOf: true,
-            },
-          },
-        },
-        include: [
-          path.join(baseDir, '..', '..', 'src'),
-          path.join(baseDir, '..'),
-          path.join(
-            baseDir,
-            '..',
-            '..',
-            'node_modules',
-            '@mapbox',
-            'mapbox-gl-style-spec'
-          ),
-        ],
-      },
-      {
         test: /\.js$/,
         use: {
-          loader: path.join(baseDir, 'worker-loader.cjs'),
+          loader: path.join(src, 'webpack', 'worker-loader.cjs'),
         },
-        include: [path.join(baseDir, '..', '..', 'src', 'ol', 'worker')],
+        include: [path.join(root, 'src', 'ol', 'worker')],
       },
     ],
   },
@@ -63,10 +39,6 @@ export default {
         // Do not minify examples that inject code into workers
         exclude: [/(color-manipulation|region-growing|raster)\.js/],
         extractComments: false,
-        terserOptions: {
-          // Mangle private members convention with underscore suffix
-          mangle: {properties: {regex: /_$/}},
-        },
       }),
     ],
     runtimeChunk: {
@@ -80,12 +52,19 @@ export default {
   },
   plugins: [
     new ExampleBuilder({
-      templates: path.join(baseDir, '..', 'templates'),
+      templates: path.join(src, 'templates'),
       common: 'common',
     }),
     new CopyPlugin({
       patterns: [
-        {from: '../src/ol/ol.css', to: 'css'},
+        {
+          from: path.join(root, 'site', 'src', 'theme'),
+          to: 'theme',
+        },
+        {
+          from: path.join(root, 'src', 'ol', 'ol.css'),
+          to: path.join('theme', 'ol.css'),
+        },
         {from: 'data', to: 'data'},
         {from: 'resources', to: 'resources'},
         {from: 'index.html', to: 'index.html'},
@@ -96,7 +75,7 @@ export default {
   devtool: 'source-map',
   output: {
     filename: '[name].js',
-    path: path.join(baseDir, '..', '..', 'build', 'examples'),
+    path: path.join(root, 'build', 'examples'),
   },
   resolve: {
     fallback: {
@@ -106,7 +85,7 @@ export default {
     },
     alias: {
       // allow imports from 'ol/module' instead of specifiying the source path
-      ol: path.join(baseDir, '..', '..', 'src', 'ol'),
+      ol: path.join(root, 'src', 'ol'),
     },
   },
 };

@@ -4,8 +4,8 @@
 import Event from './events/Event.js';
 import ObjectEventType from './ObjectEventType.js';
 import Observable from './Observable.js';
-import {assign, isEmpty} from './obj.js';
 import {getUid} from './util.js';
+import {isEmpty} from './obj.js';
 
 /**
  * @classdesc
@@ -50,7 +50,7 @@ export class ObjectEvent extends Event {
  * instantiated in apps.
  * Most non-trivial classes inherit from this.
  *
- * This extends {@link module:ol/Observable} with observable
+ * This extends {@link module:ol/Observable~Observable} with observable
  * properties, where each property is observable as well as the object as a
  * whole.
  *
@@ -89,18 +89,18 @@ export class ObjectEvent extends Event {
  */
 class BaseObject extends Observable {
   /**
-   * @param {Object<string, *>} [opt_values] An object with key-value pairs.
+   * @param {Object<string, *>} [values] An object with key-value pairs.
    */
-  constructor(opt_values) {
+  constructor(values) {
     super();
 
     /***
-     * @type {ObjectOnSignature<import("./Observable.js").OnReturn>}
+     * @type {ObjectOnSignature<import("./events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {ObjectOnSignature<import("./Observable.js").OnReturn>}
+     * @type {ObjectOnSignature<import("./events").EventsKey>}
      */
     this.once;
 
@@ -121,8 +121,8 @@ class BaseObject extends Observable {
      */
     this.values_ = null;
 
-    if (opt_values !== undefined) {
-      this.setProperties(opt_values);
+    if (values !== undefined) {
+      this.setProperties(values);
     }
   }
 
@@ -155,7 +155,7 @@ class BaseObject extends Observable {
    * @api
    */
   getProperties() {
-    return (this.values_ && assign({}, this.values_)) || {};
+    return (this.values_ && Object.assign({}, this.values_)) || {};
   }
 
   /**
@@ -172,9 +172,13 @@ class BaseObject extends Observable {
   notify(key, oldValue) {
     let eventType;
     eventType = `change:${key}`;
-    this.dispatchEvent(new ObjectEvent(eventType, key, oldValue));
+    if (this.hasListener(eventType)) {
+      this.dispatchEvent(new ObjectEvent(eventType, key, oldValue));
+    }
     eventType = ObjectEventType.PROPERTYCHANGE;
-    this.dispatchEvent(new ObjectEvent(eventType, key, oldValue));
+    if (this.hasListener(eventType)) {
+      this.dispatchEvent(new ObjectEvent(eventType, key, oldValue));
+    }
   }
 
   /**
@@ -197,12 +201,12 @@ class BaseObject extends Observable {
    * Sets a value.
    * @param {string} key Key name.
    * @param {*} value Value.
-   * @param {boolean} [opt_silent] Update without triggering an event.
+   * @param {boolean} [silent] Update without triggering an event.
    * @api
    */
-  set(key, value, opt_silent) {
+  set(key, value, silent) {
     const values = this.values_ || (this.values_ = {});
-    if (opt_silent) {
+    if (silent) {
       values[key] = value;
     } else {
       const oldValue = values[key];
@@ -217,12 +221,12 @@ class BaseObject extends Observable {
    * Sets a collection of key-value pairs.  Note that this changes any existing
    * properties and adds new ones (it does not remove any existing properties).
    * @param {Object<string, *>} values Values.
-   * @param {boolean} [opt_silent] Update without triggering an event.
+   * @param {boolean} [silent] Update without triggering an event.
    * @api
    */
-  setProperties(values, opt_silent) {
+  setProperties(values, silent) {
     for (const key in values) {
-      this.set(key, values[key], opt_silent);
+      this.set(key, values[key], silent);
     }
   }
 
@@ -235,23 +239,23 @@ class BaseObject extends Observable {
     if (!source.values_) {
       return;
     }
-    assign(this.values_ || (this.values_ = {}), source.values_);
+    Object.assign(this.values_ || (this.values_ = {}), source.values_);
   }
 
   /**
    * Unsets a property.
    * @param {string} key Key name.
-   * @param {boolean} [opt_silent] Unset without triggering an event.
+   * @param {boolean} [silent] Unset without triggering an event.
    * @api
    */
-  unset(key, opt_silent) {
+  unset(key, silent) {
     if (this.values_ && key in this.values_) {
       const oldValue = this.values_[key];
       delete this.values_[key];
       if (isEmpty(this.values_)) {
         this.values_ = null;
       }
-      if (!opt_silent) {
+      if (!silent) {
         this.notify(key, oldValue);
       }
     }

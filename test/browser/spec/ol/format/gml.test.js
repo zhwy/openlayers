@@ -1840,6 +1840,10 @@ describe('ol.format.GML3', function () {
       expect(features[0].values_['name']).to.have.length(2);
     });
 
+    it('parses mutliple simple elements to strings', function () {
+      expect(features[0].values_['name'][0]).to.be.a('string');
+    });
+
     it('creates nested property', function () {
       expect(
         features[0].values_['observationMethod']['CGI_TermValue']['value'][
@@ -2247,6 +2251,77 @@ describe('ol.format.GML32', function () {
         format = new GML32({srsName: 'CRS:84', curve: true});
         const serialized = format.writeGeometryNode(g);
         expect(serialized.firstElementChild).to.xmleql(parse(text));
+      });
+
+      it('can read and write a curve geometry', function () {
+        const text =
+          '<gml:Curve xmlns:gml="http://www.opengis.net/gml/3.2" ' +
+          '    srsName="CRS:84">' +
+          '  <gml:segments>' +
+          '    <gml:LineStringSegment>' +
+          '      <gml:posList srsDimension="2">1 2 3 4</gml:posList>' +
+          '    </gml:LineStringSegment>' +
+          '    <gml:LineStringSegment>' +
+          '      <gml:posList srsDimension="2">5 6 7 8</gml:posList>' +
+          '    </gml:LineStringSegment>' +
+          '  </gml:segments>' +
+          '</gml:Curve>';
+        const g = readGeometry(format, text);
+        expect(g).to.be.an(LineString);
+        expect(g.getCoordinates()).to.eql([
+          [1, 2, 0],
+          [3, 4, 0],
+          [5, 6, 0],
+          [7, 8, 0],
+        ]);
+        format = new GML32({srsName: 'CRS:84', curve: true});
+        const serialized = format.writeGeometryNode(g);
+        // Conversion back to GML is not lossless, because we don't know
+        // the mapping of original LineString segements to the OpenLayers
+        // LineString geometry's coordinates.
+        const expected =
+          '<gml:Curve xmlns:gml="http://www.opengis.net/gml/3.2" ' +
+          '    srsName="CRS:84">' +
+          '  <gml:segments>' +
+          '    <gml:LineStringSegment>' +
+          '      <gml:posList srsDimension="2">1 2 3 4 5 6 7 8</gml:posList>' +
+          '    </gml:LineStringSegment>' +
+          '  </gml:segments>' +
+          '</gml:Curve>';
+        expect(serialized.firstElementChild).to.xmleql(parse(expected));
+      });
+
+      it('can read a polygon with a ring of curves', function () {
+        const text = `
+        <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2" srsName="CRS:84">
+          <gml:exterior>
+            <gml:Ring>
+              <gml:curveMember>
+                <gml:Curve>
+                  <gml:segments>
+                    <gml:LineStringSegment interpolation="linear">
+                      <gml:posList>1 2 3 4</gml:posList>
+                    </gml:LineStringSegment>
+                    <gml:LineStringSegment interpolation="linear">
+                      <gml:posList>5 6 7 8</gml:posList>
+                    </gml:LineStringSegment>
+                  </gml:segments>
+                </gml:Curve>
+              </gml:curveMember>
+            </gml:Ring>
+          </gml:exterior>
+        </gml:Polygon>
+        `;
+        const g = readGeometry(format, text);
+        expect(g).to.be.an(Polygon);
+        expect(g.getCoordinates()).to.eql([
+          [
+            [1, 2, 0],
+            [3, 4, 0],
+            [5, 6, 0],
+            [7, 8, 0],
+          ],
+        ]);
       });
     });
 
@@ -2900,6 +2975,51 @@ describe('ol.format.GML32', function () {
 
     it('converts XML attribute to text', function () {
       expect(features[0].get('cdata')).to.be('<a>b</a>');
+    });
+  });
+
+  describe('when parsing multiple complex attributes', function () {
+    let features;
+    let gmlFormat;
+    before(function (done) {
+      afterLoadText('spec/ol/format/gml/gml32-complex.xml', function (xml) {
+        try {
+          gmlFormat = new GML32();
+          features = gmlFormat.readFeatures(xml);
+        } catch (e) {
+          done(e);
+        }
+        done();
+      });
+    });
+
+    it('creates 2 features', function () {
+      expect(features).to.have.length(2);
+    });
+
+    it('creates feature with three attributeA properties and two attributeB properties', function () {
+      expect(features[0].values_['attributeA']).to.have.length(3);
+      expect(features[0].values_['attributeB']).to.have.length(2);
+    });
+
+    it('parses mutliple complex elements to an array of objects', function () {
+      expect(features[0].values_['attributeA'][0]).to.be.a('object');
+    });
+
+    it('correctly structures multiple elements with attributes', function () {
+      expect(features[0].values_['attributeA'][0]['xlink:href']).to.be(
+        'http://www.example.com/extern/1'
+      );
+      expect(features[0].values_['attributeA'][0]._content_).to.be(undefined);
+      expect(features[0].values_['attributeA'][1]['xlink:href']).to.be(
+        'http://www.example.com/extern/2'
+      );
+      expect(features[0].values_['attributeA'][2]._content_).to.be(undefined);
+    });
+
+    it('correctly structures multiple elements with complex content', function () {
+      expect(features[0].values_['attributeB'][0].Attribute.value).to.be('foo');
+      expect(features[0].values_['attributeB'][1].Attribute.value).to.be('bar');
     });
   });
 });

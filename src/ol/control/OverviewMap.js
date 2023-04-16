@@ -1,15 +1,14 @@
 /**
  * @module ol/control/OverviewMap
  */
-import CompositeMapRenderer from '../renderer/Composite.js';
+import Collection from '../Collection.js';
 import Control from './Control.js';
 import EventType from '../events/EventType.js';
+import Map from '../Map.js';
 import MapEventType from '../MapEventType.js';
 import MapProperty from '../MapProperty.js';
 import ObjectEventType from '../ObjectEventType.js';
 import Overlay from '../Overlay.js';
-import OverlayPositioning from '../OverlayPositioning.js';
-import PluggableMap from '../PluggableMap.js';
 import View from '../View.js';
 import ViewProperty from '../ViewProperty.js';
 import {CLASS_COLLAPSED, CLASS_CONTROL, CLASS_UNSELECTABLE} from '../css.js';
@@ -38,22 +37,16 @@ const MAX_RATIO = 0.75;
  */
 const MIN_RATIO = 0.1;
 
-class ControlledMap extends PluggableMap {
-  createRenderer() {
-    return new CompositeMapRenderer(this);
-  }
-}
-
 /**
  * @typedef {Object} Options
  * @property {string} [className='ol-overviewmap'] CSS class name.
  * @property {boolean} [collapsed=true] Whether the control should start collapsed or not (expanded).
- * @property {string|HTMLElement} [collapseLabel='«'] Text label to use for the
+ * @property {string|HTMLElement} [collapseLabel='‹'] Text label to use for the
  * expanded overviewmap button. Instead of text, also an element (e.g. a `span` element) can be used.
  * @property {boolean} [collapsible=true] Whether the control can be collapsed or not.
- * @property {string|HTMLElement} [label='»'] Text label to use for the collapsed
+ * @property {string|HTMLElement} [label='›'] Text label to use for the collapsed
  * overviewmap button. Instead of text, also an element (e.g. a `span` element) can be used.
- * @property {Array<import("../layer/Layer.js").default>|import("../Collection.js").default<import("../layer/Layer.js").default>} [layers]
+ * @property {Array<import("../layer/Base.js").default>|import("../Collection.js").default<import("../layer/Base.js").default>} [layers]
  * Layers for the overview map.
  * @property {function(import("../MapEvent.js").default):void} [render] Function called when the control
  * should be re-rendered. This is called in a `requestAnimationFrame` callback.
@@ -73,10 +66,10 @@ class ControlledMap extends PluggableMap {
  */
 class OverviewMap extends Control {
   /**
-   * @param {Options} [opt_options] OverviewMap options.
+   * @param {Options} [options] OverviewMap options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     super({
       element: document.createElement('div'),
@@ -127,7 +120,7 @@ class OverviewMap extends Control {
       options.tipLabel !== undefined ? options.tipLabel : 'Overview map';
 
     const collapseLabel =
-      options.collapseLabel !== undefined ? options.collapseLabel : '\u00AB';
+      options.collapseLabel !== undefined ? options.collapseLabel : '\u2039';
 
     if (typeof collapseLabel === 'string') {
       /**
@@ -140,7 +133,7 @@ class OverviewMap extends Control {
       this.collapseLabel_ = collapseLabel;
     }
 
-    const label = options.label !== undefined ? options.label : '\u00BB';
+    const label = options.label !== undefined ? options.label : '\u203A';
 
     if (typeof label === 'string') {
       /**
@@ -180,14 +173,17 @@ class OverviewMap extends Control {
      */
     this.view_ = options.view;
 
+    const ovmap = new Map({
+      view: options.view,
+      controls: new Collection(),
+      interactions: new Collection(),
+    });
+
     /**
-     * @type {ControlledMap}
+     * @type {Map}
      * @private
      */
-    this.ovmap_ = new ControlledMap({
-      view: options.view,
-    });
-    const ovmap = this.ovmap_;
+    this.ovmap_ = ovmap;
 
     if (options.layers) {
       options.layers.forEach(function (layer) {
@@ -205,7 +201,7 @@ class OverviewMap extends Control {
      */
     this.boxOverlay_ = new Overlay({
       position: [0, 0],
-      positioning: OverlayPositioning.CENTER_CENTER,
+      positioning: 'center-center',
       element: box,
     });
     this.ovmap_.addOverlay(this.boxOverlay_);
@@ -267,9 +263,10 @@ class OverviewMap extends Control {
 
   /**
    * Remove the control from its current map and attach it to the new map.
+   * Pass `null` to just remove the control from the current map.
    * Subclasses may set up event handlers to get notified about changes to
    * the map here.
-   * @param {import("../PluggableMap.js").default} map Map.
+   * @param {import("../Map.js").default|null} map Map.
    * @api
    */
   setMap(map) {
@@ -661,7 +658,7 @@ class OverviewMap extends Control {
 
   /**
    * Return the overview map.
-   * @return {import("../PluggableMap.js").default} Overview map.
+   * @return {import("../Map.js").default} Overview map.
    * @api
    */
   getOverviewMap() {

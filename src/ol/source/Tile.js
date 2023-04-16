@@ -32,12 +32,14 @@ import {scale as scaleSize, toSize} from '../size.js';
  * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {number} [tilePixelRatio] TilePixelRatio.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection.
- * @property {import("./State.js").default} [state] State.
+ * @property {import("./Source.js").State} [state] State.
  * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] TileGrid.
- * @property {boolean} [wrapX=true] WrapX.
+ * @property {boolean} [wrapX=false] WrapX.
  * @property {number} [transition] Transition.
  * @property {string} [key] Key.
  * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0] ZDirection.
+ * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
+ * the nearest neighbor is used when resampling.
  */
 
 /**
@@ -59,15 +61,16 @@ class TileSource extends Source {
       projection: options.projection,
       state: options.state,
       wrapX: options.wrapX,
+      interpolate: options.interpolate,
     });
 
     /***
-     * @type {TileSourceOnSignature<import("../Observable.js").OnReturn>}
+     * @type {TileSourceOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {TileSourceOnSignature<import("../Observable.js").OnReturn>}
+     * @type {TileSourceOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -90,15 +93,13 @@ class TileSource extends Source {
       options.tilePixelRatio !== undefined ? options.tilePixelRatio : 1;
 
     /**
-     * @protected
-     * @type {import("../tilegrid/TileGrid.js").default}
+     * @type {import("../tilegrid/TileGrid.js").default|null}
      */
     this.tileGrid = options.tileGrid !== undefined ? options.tileGrid : null;
 
     const tileSize = [256, 256];
-    const tileGrid = options.tileGrid;
-    if (tileGrid) {
-      toSize(tileGrid.getTileSize(tileGrid.getMinZoom()), tileSize);
+    if (this.tileGrid) {
+      toSize(this.tileGrid.getTileSize(this.tileGrid.getMinZoom()), tileSize);
     }
 
     /**
@@ -123,7 +124,10 @@ class TileSource extends Source {
      * @protected
      * @type {import("../Tile.js").Options}
      */
-    this.tileOptions = {transition: options.transition};
+    this.tileOptions = {
+      transition: options.transition,
+      interpolate: options.interpolate,
+    };
 
     /**
      * zDirection hint, read by the renderer. Indicates which resolution should be used
@@ -202,7 +206,6 @@ class TileSource extends Source {
   /**
    * Return the key to be used for all tiles in the source.
    * @return {string} The key for all tiles.
-   * @protected
    */
   getKey() {
     return this.key_;
@@ -229,10 +232,17 @@ class TileSource extends Source {
   }
 
   /**
-   * @return {Array<number>} Resolutions.
+   * @param {import("../proj/Projection").default} [projection] Projection.
+   * @return {Array<number>|null} Resolutions.
    */
-  getResolutions() {
-    return this.tileGrid.getResolutions();
+  getResolutions(projection) {
+    const tileGrid = projection
+      ? this.getTileGridForProjection(projection)
+      : this.tileGrid;
+    if (!tileGrid) {
+      return null;
+    }
+    return tileGrid.getResolutions();
   }
 
   /**
@@ -250,7 +260,7 @@ class TileSource extends Source {
 
   /**
    * Return the tile grid of the tile source.
-   * @return {import("../tilegrid/TileGrid.js").default} Tile grid.
+   * @return {import("../tilegrid/TileGrid.js").default|null} Tile grid.
    * @api
    */
   getTileGrid() {
@@ -264,9 +274,8 @@ class TileSource extends Source {
   getTileGridForProjection(projection) {
     if (!this.tileGrid) {
       return getTileGridForProjection(projection);
-    } else {
-      return this.tileGrid;
     }
+    return this.tileGrid;
   }
 
   /**
@@ -275,8 +284,9 @@ class TileSource extends Source {
    * @protected
    */
   getTileCacheForProjection(projection) {
+    const sourceProjection = this.getProjection();
     assert(
-      equivalent(this.getProjection(), projection),
+      sourceProjection === null || equivalent(sourceProjection, projection),
       68 // A VectorTile source can only be rendered if it has a projection compatible with the view projection.
     );
     return this.tileCache;
@@ -305,9 +315,8 @@ class TileSource extends Source {
     const tileSize = toSize(tileGrid.getTileSize(z), this.tmpSize);
     if (tilePixelRatio == 1) {
       return tileSize;
-    } else {
-      return scaleSize(tileSize, tilePixelRatio, this.tmpSize);
     }
+    return scaleSize(tileSize, tilePixelRatio, this.tmpSize);
   }
 
   /**
@@ -315,13 +324,12 @@ class TileSource extends Source {
    * is outside the resolution and extent range of the tile grid, `null` will be
    * returned.
    * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
-   * @param {import("../proj/Projection.js").default} [opt_projection] Projection.
+   * @param {import("../proj/Projection.js").default} [projection] Projection.
    * @return {import("../tilecoord.js").TileCoord} Tile coordinate to be passed to the tileUrlFunction or
    *     null if no tile URL should be created for the passed `tileCoord`.
    */
-  getTileCoordForTileUrlFunction(tileCoord, opt_projection) {
-    const projection =
-      opt_projection !== undefined ? opt_projection : this.getProjection();
+  getTileCoordForTileUrlFunction(tileCoord, projection) {
+    projection = projection !== undefined ? projection : this.getProjection();
     const tileGrid = this.getTileGridForProjection(projection);
     if (this.getWrapX() && projection.isGlobal()) {
       tileCoord = wrapX(tileGrid, tileCoord, projection);

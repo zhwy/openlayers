@@ -8,7 +8,7 @@ import {abstract} from './util.js';
 import {easeIn} from './easing.js';
 
 /**
- * A function that takes an {@link module:ol/Tile} for the tile and a
+ * A function that takes an {@link module:ol/Tile~Tile} for the tile and a
  * `{string}` for the url as arguments. The default is
  * ```js
  * source.setTileLoadFunction(function(tile, src) {
@@ -19,13 +19,13 @@ import {easeIn} from './easing.js';
  * error handling:
  *
  * ```js
- * import TileState from 'ol/TileState';
+ * import TileState from 'ol/TileState.js';
  *
  * source.setTileLoadFunction(function(tile, src) {
- *   var xhr = new XMLHttpRequest();
+ *   const xhr = new XMLHttpRequest();
  *   xhr.responseType = 'blob';
  *   xhr.addEventListener('loadend', function (evt) {
- *     var data = this.response;
+ *     const data = this.response;
  *     if (data !== undefined) {
  *       tile.getImage().src = URL.createObjectURL(data);
  *     } else {
@@ -45,12 +45,12 @@ import {easeIn} from './easing.js';
  */
 
 /**
- * {@link module:ol/source/Tile~Tile} sources use a function of this type to get
+ * {@link module:ol/source/Tile~TileSource} sources use a function of this type to get
  * the url that provides a tile for a given tile coordinate.
  *
  * This function takes an {@link module:ol/tilecoord~TileCoord} for the tile
  * coordinate, a `{number}` representing the pixel ratio and a
- * {@link module:ol/proj/Projection} for the projection  as arguments
+ * {@link module:ol/proj/Projection~Projection} for the projection  as arguments
  * and returns a `{string}` representing the tile URL, or undefined if no tile
  * should be requested for the passed tile coordinate.
  *
@@ -63,6 +63,8 @@ import {easeIn} from './easing.js';
  * @typedef {Object} Options
  * @property {number} [transition=250] A duration for tile opacity
  * transitions in milliseconds. A duration of 0 disables the opacity transition.
+ * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
+ * the nearest neighbor is used when resampling.
  * @api
  */
 
@@ -76,12 +78,12 @@ class Tile extends EventTarget {
   /**
    * @param {import("./tilecoord.js").TileCoord} tileCoord Tile coordinate.
    * @param {import("./TileState.js").default} state State.
-   * @param {Options} [opt_options] Tile options.
+   * @param {Options} [options] Tile options.
    */
-  constructor(tileCoord, state, opt_options) {
+  constructor(tileCoord, state, options) {
     super();
 
-    const options = opt_options ? opt_options : {};
+    options = options ? options : {};
 
     /**
      * @type {import("./tilecoord.js").TileCoord}
@@ -123,6 +125,11 @@ class Tile extends EventTarget {
      * @type {Object<string, number>}
      */
     this.transitionStarts_ = {};
+
+    /**
+     * @type {boolean}
+     */
+    this.interpolate = !!options.interpolate;
   }
 
   /**
@@ -135,7 +142,12 @@ class Tile extends EventTarget {
   /**
    * Called by the tile cache when the tile is removed from the cache due to expiry
    */
-  release() {}
+  release() {
+    if (this.state === TileState.ERROR) {
+      // to remove the `change` listener on this tile in `ol/TileQueue#handleTileChange`
+      this.setState(TileState.EMPTY);
+    }
+  }
 
   /**
    * @return {string} Key.
@@ -185,7 +197,11 @@ class Tile extends EventTarget {
     }
 
     let tile = this.interimTile;
-    let prev = /** @type {Tile} */ (this);
+
+    /**
+     * @type {Tile}
+     */
+    let prev = this;
 
     do {
       if (tile.getState() == TileState.LOADED) {

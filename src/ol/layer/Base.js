@@ -5,8 +5,14 @@ import BaseObject from '../Object.js';
 import LayerProperty from './Property.js';
 import {abstract} from '../util.js';
 import {assert} from '../asserts.js';
-import {assign} from '../obj.js';
 import {clamp} from '../math.js';
+
+/**
+ * A css color, or a function called with a view resolution returning a css color.
+ *
+ * @typedef {string|function(number):string} BackgroundColor
+ * @api
+ */
 
 /**
  * @typedef {import("../ObjectEventType").Types|'change:extent'|'change:maxResolution'|'change:maxZoom'|
@@ -39,6 +45,8 @@ import {clamp} from '../math.js';
  * visible.
  * @property {number} [maxZoom] The maximum view zoom level (inclusive) at which this layer will
  * be visible.
+ * @property {BackgroundColor} [background] Background color for the layer. If not specified, no background
+ * will be rendered.
  * @property {Object<string, *>} [properties] Arbitrary observable properties. Can be accessed with `#get()` and `#set()`.
  */
 
@@ -46,8 +54,8 @@ import {clamp} from '../math.js';
  * @classdesc
  * Abstract base class; normally only used for creating subclasses and not
  * instantiated in apps.
- * Note that with {@link module:ol/layer/Base} and all its subclasses, any property set in
- * the options is set as a {@link module:ol/Object} property on the layer object, so
+ * Note that with {@link module:ol/layer/Base~BaseLayer} and all its subclasses, any property set in
+ * the options is set as a {@link module:ol/Object~BaseObject} property on the layer object, so
  * is observable, and has get/set accessors.
  *
  * @api
@@ -60,12 +68,12 @@ class BaseLayer extends BaseObject {
     super();
 
     /***
-     * @type {BaseLayerOnSignature<import("../Observable.js").OnReturn>}
+     * @type {BaseLayerOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {BaseLayerOnSignature<import("../Observable.js").OnReturn>}
+     * @type {BaseLayerOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -75,12 +83,18 @@ class BaseLayer extends BaseObject {
     this.un;
 
     /**
+     * @type {BackgroundColor|false}
+     * @private
+     */
+    this.background_ = options.background;
+
+    /**
      * @type {Object<string, *>}
      */
-    const properties = assign({}, options);
+    const properties = Object.assign({}, options);
     if (typeof options.properties === 'object') {
       delete properties.properties;
-      assign(properties, options.properties);
+      Object.assign(properties, options.properties);
     }
 
     properties[LayerProperty.OPACITY] =
@@ -104,7 +118,7 @@ class BaseLayer extends BaseObject {
      * @private
      */
     this.className_ =
-      properties.className !== undefined ? options.className : 'ol-layer';
+      properties.className !== undefined ? properties.className : 'ol-layer';
     delete properties.className;
 
     this.setProperties(properties);
@@ -114,6 +128,14 @@ class BaseLayer extends BaseObject {
      * @private
      */
     this.state_ = null;
+  }
+
+  /**
+   * Get the background for this layer.
+   * @return {BackgroundColor|false} Layer background.
+   */
+  getBackground() {
+    return this.background_;
   }
 
   /**
@@ -127,20 +149,19 @@ class BaseLayer extends BaseObject {
    * This method is not meant to be called by layers or layer renderers because the state
    * is incorrect if the layer is included in a layer group.
    *
-   * @param {boolean} [opt_managed] Layer is managed.
+   * @param {boolean} [managed] Layer is managed.
    * @return {import("./Layer.js").State} Layer state.
    */
-  getLayerState(opt_managed) {
+  getLayerState(managed) {
     /** @type {import("./Layer.js").State} */
     const state =
       this.state_ ||
       /** @type {?} */ ({
         layer: this,
-        managed: opt_managed === undefined ? true : opt_managed,
+        managed: managed === undefined ? true : managed,
       });
     const zIndex = this.getZIndex();
     state.opacity = clamp(Math.round(this.getOpacity() * 100) / 100, 0, 1);
-    state.sourceState = this.getSourceState();
     state.visible = this.getVisible();
     state.extent = this.getExtent();
     state.zIndex = zIndex === undefined && !state.managed ? Infinity : zIndex;
@@ -155,21 +176,21 @@ class BaseLayer extends BaseObject {
 
   /**
    * @abstract
-   * @param {Array<import("./Layer.js").default>} [opt_array] Array of layers (to be
+   * @param {Array<import("./Layer.js").default>} [array] Array of layers (to be
    *     modified in place).
    * @return {Array<import("./Layer.js").default>} Array of layers.
    */
-  getLayersArray(opt_array) {
+  getLayersArray(array) {
     return abstract();
   }
 
   /**
    * @abstract
-   * @param {Array<import("./Layer.js").State>} [opt_states] Optional list of layer
+   * @param {Array<import("./Layer.js").State>} [states] Optional list of layer
    *     states (to be modified in place).
    * @return {Array<import("./Layer.js").State>} List of layer states.
    */
-  getLayerStatesArray(opt_states) {
+  getLayerStatesArray(states) {
     return abstract();
   }
 
@@ -238,7 +259,7 @@ class BaseLayer extends BaseObject {
 
   /**
    * @abstract
-   * @return {import("../source/State.js").default} Source state.
+   * @return {import("../source/Source.js").State} Source state.
    */
   getSourceState() {
     return abstract();
@@ -263,6 +284,15 @@ class BaseLayer extends BaseObject {
    */
   getZIndex() {
     return /** @type {number} */ (this.get(LayerProperty.Z_INDEX));
+  }
+
+  /**
+   * Sets the background color.
+   * @param {BackgroundColor} [background] Background color.
+   */
+  setBackground(background) {
+    this.background_ = background;
+    this.changed();
   }
 
   /**

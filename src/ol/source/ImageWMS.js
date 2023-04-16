@@ -2,16 +2,14 @@
  * @module ol/source/ImageWMS
  */
 
-import {DEFAULT_WMS_VERSION} from './common.js';
-
 import EventType from '../events/EventType.js';
 import ImageSource, {defaultImageLoadFunction} from './Image.js';
 import ImageWrapper from '../Image.js';
-import WMSServerType from './WMSServerType.js';
+import {DEFAULT_VERSION} from './wms.js';
 import {appendParams} from '../uri.js';
 import {assert} from '../asserts.js';
-import {assign} from '../obj.js';
 import {calculateSourceResolution} from '../reproj.js';
+import {ceil, floor, round} from '../math.js';
 import {compareVersions} from '../string.js';
 import {
   containsExtent,
@@ -21,6 +19,12 @@ import {
   getWidth,
 } from '../extent.js';
 import {get as getProjection, transform} from '../proj.js';
+
+/**
+ * Number of decimal digits to consider in integer values when rounding.
+ * @type {number}
+ */
+const DECIMALS = 4;
 
 /**
  * @const
@@ -36,11 +40,13 @@ const GETFEATUREINFO_IMAGE_SIZE = [101, 101];
  * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
  * @property {boolean} [hidpi=true] Use the `ol/Map#pixelRatio` value when requesting
  * the image from the remote server.
- * @property {import("./WMSServerType.js").default|string} [serverType] The type of
- * the remote WMS server: `mapserver`, `geoserver` or `qgis`. Only needed if `hidpi` is `true`.
+ * @property {import("./wms.js").ServerType} [serverType] The type of
+ * the remote WMS server: `mapserver`, `geoserver`, `carmentaserver`, or `qgis`.
+ * Only needed if `hidpi` is `true`.
  * @property {import("../Image.js").LoadFunction} [imageLoadFunction] Optional function to load an image given a URL.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
- * @property {Object<string,*>} params WMS request parameters.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {Object<string,*>} [params] WMS request parameters.
  * At least a `LAYERS` param is required. `STYLES` is
  * `''` by default. `VERSION` is `1.3.0` by default. `WIDTH`, `HEIGHT`, `BBOX`
  * and `CRS` (`SRS` for WMS version < 1.3.0) will be set dynamically.
@@ -50,7 +56,7 @@ const GETFEATUREINFO_IMAGE_SIZE = [101, 101];
  * higher.
  * @property {Array<number>} [resolutions] Resolutions.
  * If specified, requests will be made for these resolutions only.
- * @property {string} url WMS service URL.
+ * @property {string} [url] WMS service URL.
  */
 
 /**
@@ -62,14 +68,14 @@ const GETFEATUREINFO_IMAGE_SIZE = [101, 101];
  */
 class ImageWMS extends ImageSource {
   /**
-   * @param {Options} [opt_options] ImageWMS options.
+   * @param {Options} [options] ImageWMS options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     super({
       attributions: options.attributions,
-      imageSmoothing: options.imageSmoothing,
+      interpolate: options.interpolate,
       projection: options.projection,
       resolutions: options.resolutions,
     });
@@ -100,7 +106,7 @@ class ImageWMS extends ImageSource {
      * @private
      * @type {!Object}
      */
-    this.params_ = options.params || {};
+    this.params_ = Object.assign({}, options.params);
 
     /**
      * @private
@@ -111,12 +117,9 @@ class ImageWMS extends ImageSource {
 
     /**
      * @private
-     * @type {import("./WMSServerType.js").default|undefined}
+     * @type {import("./wms.js").ServerType}
      */
-    this.serverType_ =
-      /** @type {import("./WMSServerType.js").default|undefined} */ (
-        options.serverType
-      );
+    this.serverType_ = options.serverType;
 
     /**
      * @private
@@ -189,16 +192,16 @@ class ImageWMS extends ImageSource {
 
     const baseParams = {
       'SERVICE': 'WMS',
-      'VERSION': DEFAULT_WMS_VERSION,
+      'VERSION': DEFAULT_VERSION,
       'REQUEST': 'GetFeatureInfo',
       'FORMAT': 'image/png',
       'TRANSPARENT': true,
       'QUERY_LAYERS': this.params_['LAYERS'],
     };
-    assign(baseParams, this.params_, params);
+    Object.assign(baseParams, this.params_, params);
 
-    const x = Math.floor((coordinate[0] - extent[0]) / resolution);
-    const y = Math.floor((extent[3] - coordinate[1]) / resolution);
+    const x = floor((coordinate[0] - extent[0]) / resolution, DECIMALS);
+    const y = floor((extent[3] - coordinate[1]) / resolution, DECIMALS);
     baseParams[this.v13_ ? 'I' : 'X'] = x;
     baseParams[this.v13_ ? 'J' : 'Y'] = y;
 
@@ -232,7 +235,7 @@ class ImageWMS extends ImageSource {
 
     const baseParams = {
       'SERVICE': 'WMS',
-      'VERSION': DEFAULT_WMS_VERSION,
+      'VERSION': DEFAULT_VERSION,
       'REQUEST': 'GetLegendGraphic',
       'FORMAT': 'image/png',
     };
@@ -254,7 +257,7 @@ class ImageWMS extends ImageSource {
       baseParams['SCALE'] = (resolution * mpu) / pixelSize;
     }
 
-    assign(baseParams, params);
+    Object.assign(baseParams, params);
 
     return appendParams(/** @type {string} */ (this.url_), baseParams);
   }
@@ -290,17 +293,19 @@ class ImageWMS extends ImageSource {
     const imageResolution = resolution / pixelRatio;
 
     const center = getCenter(extent);
-    const viewWidth = Math.ceil(getWidth(extent) / imageResolution);
-    const viewHeight = Math.ceil(getHeight(extent) / imageResolution);
+    const viewWidth = ceil(getWidth(extent) / imageResolution, DECIMALS);
+    const viewHeight = ceil(getHeight(extent) / imageResolution, DECIMALS);
     const viewExtent = getForViewAndSize(center, imageResolution, 0, [
       viewWidth,
       viewHeight,
     ]);
-    const requestWidth = Math.ceil(
-      (this.ratio_ * getWidth(extent)) / imageResolution
+    const requestWidth = ceil(
+      (this.ratio_ * getWidth(extent)) / imageResolution,
+      DECIMALS
     );
-    const requestHeight = Math.ceil(
-      (this.ratio_ * getHeight(extent)) / imageResolution
+    const requestHeight = ceil(
+      (this.ratio_ * getHeight(extent)) / imageResolution,
+      DECIMALS
     );
     const requestExtent = getForViewAndSize(center, imageResolution, 0, [
       requestWidth,
@@ -320,15 +325,21 @@ class ImageWMS extends ImageSource {
 
     const params = {
       'SERVICE': 'WMS',
-      'VERSION': DEFAULT_WMS_VERSION,
+      'VERSION': DEFAULT_VERSION,
       'REQUEST': 'GetMap',
       'FORMAT': 'image/png',
       'TRANSPARENT': true,
     };
-    assign(params, this.params_);
+    Object.assign(params, this.params_);
 
-    this.imageSize_[0] = Math.round(getWidth(requestExtent) / imageResolution);
-    this.imageSize_[1] = Math.round(getHeight(requestExtent) / imageResolution);
+    this.imageSize_[0] = round(
+      getWidth(requestExtent) / imageResolution,
+      DECIMALS
+    );
+    this.imageSize_[1] = round(
+      getHeight(requestExtent) / imageResolution,
+      DECIMALS
+    );
 
     const url = this.getRequestUrl_(
       requestExtent,
@@ -386,7 +397,7 @@ class ImageWMS extends ImageSource {
 
     if (pixelRatio != 1) {
       switch (this.serverType_) {
-        case WMSServerType.GEOSERVER:
+        case 'geoserver':
           const dpi = (90 * pixelRatio + 0.5) | 0;
           if ('FORMAT_OPTIONS' in params) {
             params['FORMAT_OPTIONS'] += ';dpi:' + dpi;
@@ -394,15 +405,15 @@ class ImageWMS extends ImageSource {
             params['FORMAT_OPTIONS'] = 'dpi:' + dpi;
           }
           break;
-        case WMSServerType.MAPSERVER:
+        case 'mapserver':
           params['MAP_RESOLUTION'] = 90 * pixelRatio;
           break;
-        case WMSServerType.CARMENTA_SERVER:
-        case WMSServerType.QGIS:
+        case 'carmentaserver':
+        case 'qgis':
           params['DPI'] = 90 * pixelRatio;
           break;
-        default:
-          assert(false, 8); // Unknown `serverType` configured
+        default: // Unknown `serverType` configured
+          assert(false, 8);
           break;
       }
     }
@@ -461,7 +472,7 @@ class ImageWMS extends ImageSource {
    * @api
    */
   updateParams(params) {
-    assign(this.params_, params);
+    Object.assign(this.params_, params);
     this.updateV13_();
     this.image_ = null;
     this.changed();
@@ -471,7 +482,7 @@ class ImageWMS extends ImageSource {
    * @private
    */
   updateV13_() {
-    const version = this.params_['VERSION'] || DEFAULT_WMS_VERSION;
+    const version = this.params_['VERSION'] || DEFAULT_VERSION;
     this.v13_ = compareVersions(version, '1.3') >= 0;
   }
 }

@@ -4,18 +4,20 @@
 import BaseVectorLayer from './BaseVector.js';
 import CanvasVectorTileLayerRenderer from '../renderer/canvas/VectorTileLayer.js';
 import TileProperty from './TileProperty.js';
-import VectorTileRenderType from './VectorTileRenderType.js';
 import {assert} from '../asserts.js';
-import {assign} from '../obj.js';
 
 /***
  * @template Return
  * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes, import("../events/Event.js").default, Return> &
  *   import("../Observable").OnSignature<import("./Base").BaseLayerObjectEventTypes|
- *     'change:source'|'change:preload'|'change:useInterimTilesOnError', import("../Object").ObjectEvent, Return> &
+ *     import("./Layer.js").LayerEventType|'change:preload'|'change:useInterimTilesOnError', import("../Object").ObjectEvent, Return> &
  *   import("../Observable").OnSignature<import("../render/EventType").LayerRenderEventTypes, import("../render/Event").default, Return> &
  *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|import("./Base").BaseLayerObjectEventTypes|
- *     'change:source'|'change:preload'|'change:useInterimTilesOnError'|import("../render/EventType").LayerRenderEventTypes, Return>} VectorTileLayerOnSignature
+ *     import("./Layer.js").LayerEventType|'change:preload'|'change:useInterimTilesOnError'|import("../render/EventType").LayerRenderEventTypes, Return>} VectorTileLayerOnSignature
+ */
+
+/**
+ * @typedef {'hybrid' | 'vector'} VectorTileRenderType
  */
 
 /**
@@ -45,7 +47,7 @@ import {assign} from '../obj.js';
  * Recommended value: Vector tiles are usually generated with a buffer, so this value should match
  * the largest possible buffer of the used tiles. It should be at least the size of the largest
  * point symbol or line width.
- * @property {import("./VectorTileRenderType.js").default|string} [renderMode='hybrid'] Render mode for vector tiles:
+ * @property {VectorTileRenderType} [renderMode='hybrid'] Render mode for vector tiles:
  *  * `'hybrid'`: Polygon and line elements are rendered as images, so pixels are scaled during zoom
  *    animations. Point symbols and texts are accurately rendered as vectors and can stay upright on
  *    rotated views.
@@ -53,18 +55,25 @@ import {assign} from '../obj.js';
  *    tile layers with only a few rendered features (e.g. for highlighting a subset of features of
  *    another layer with the same source).
  * @property {import("../source/VectorTile.js").default} [source] Source.
- * @property {import("../PluggableMap.js").default} [map] Sets the layer as overlay on a map. The map will not manage
+ * @property {import("../Map.js").default} [map] Sets the layer as overlay on a map. The map will not manage
  * this layer in its layers collection, and the layer will be rendered on top. This is useful for
  * temporary layers. The standard way to add a layer to a map and have it managed by the map is to
- * use {@link import("../PluggableMap.js").default#addLayer map.addLayer()}.
+ * use [map.addLayer()]{@link import("../Map.js").default#addLayer}.
  * @property {boolean} [declutter=false] Declutter images and text. Decluttering is applied to all
  * image and text styles of all Vector and VectorTile layers that have set this to `true`. The priority
  * is defined by the z-index of the layer, the `zIndex` of the style and the render order of features.
  * Higher z-index means higher priority. Within the same z-index, a feature rendered before another has
  * higher priority.
- * @property {import("../style/Style.js").StyleLike} [style] Layer style. See
- * {@link import("../style/Style.js").default the style docs} for the default style that will be used if
- * this is not defined.
+ *
+ * As an optimization decluttered features from layers with the same `className` are rendered above
+ * the fill and stroke styles of all of those layers regardless of z-index.  To opt out of this
+ * behavior and place declutterd features with their own layer configure the layer with a `className`
+ * other than `ol-layer`.
+ * @property {import("../style/Style.js").StyleLike|null} [style] Layer style. When set to `null`, only
+ * features that have their own style will be rendered. See {@link module:ol/style/Style~Style} for the default style
+ * which will be used if this is not set.
+ * @property {import("./Base.js").BackgroundColor|false} [background] Background color for the layer. If not specified, no
+ * background will be rendered.
  * @property {boolean} [updateWhileAnimating=false] When set to `true`, feature batches will be
  * recreated during animations. This means that no vectors will be shown clipped, but the setting
  * will have a performance impact for large amounts of vector data. When set to `false`, batches
@@ -80,22 +89,22 @@ import {assign} from '../obj.js';
 /**
  * @classdesc
  * Layer for vector tile data that is rendered client-side.
- * Note that any property set in the options is set as a {@link module:ol/Object~BaseObject BaseObject}
+ * Note that any property set in the options is set as a {@link module:ol/Object~BaseObject}
  * property on the layer object; for example, setting `title: 'My Title'` in the
  * options means that `title` is observable, and has get/set accessors.
  *
- * @param {Options} [opt_options] Options.
- * @extends {BaseVectorLayer<import("../source/VectorTile.js").default>}
+ * @param {Options} [options] Options.
+ * @extends {BaseVectorLayer<import("../source/VectorTile.js").default, CanvasVectorTileLayerRenderer>}
  * @api
  */
 class VectorTileLayer extends BaseVectorLayer {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
-    const baseOptions = /** @type {Object} */ (assign({}, options));
+    const baseOptions = /** @type {Object} */ (Object.assign({}, options));
     delete baseOptions.preload;
     delete baseOptions.useInterimTilesOnError;
 
@@ -106,12 +115,12 @@ class VectorTileLayer extends BaseVectorLayer {
     );
 
     /***
-     * @type {VectorTileLayerOnSignature<import("../Observable.js").OnReturn>}
+     * @type {VectorTileLayerOnSignature<import("../events").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {VectorTileLayerOnSignature<import("../Observable.js").OnReturn>}
+     * @type {VectorTileLayerOnSignature<import("../events").EventsKey>}
      */
     this.once;
 
@@ -120,22 +129,13 @@ class VectorTileLayer extends BaseVectorLayer {
      */
     this.un;
 
-    if (options.renderMode === VectorTileRenderType.IMAGE) {
-      //FIXME deprecated - remove this check in v7.
-      //eslint-disable-next-line
-      console.warn('renderMode: "image" is deprecated. Option ignored.')
-      options.renderMode = undefined;
-    }
-    const renderMode = options.renderMode || VectorTileRenderType.HYBRID;
-    assert(
-      renderMode == VectorTileRenderType.HYBRID ||
-        renderMode == VectorTileRenderType.VECTOR,
-      28
-    ); // `renderMode` must be `'hybrid'` or `'vector'`.
+    const renderMode = options.renderMode || 'hybrid';
+    // `renderMode` must be `'hybrid'` or `'vector'`.
+    assert(renderMode == 'hybrid' || renderMode == 'vector', 28);
 
     /**
      * @private
-     * @type {import("./VectorTileRenderType.js").default}
+     * @type {VectorTileRenderType}
      */
     this.renderMode_ = renderMode;
 
@@ -145,13 +145,22 @@ class VectorTileLayer extends BaseVectorLayer {
         ? options.useInterimTilesOnError
         : true
     );
+
+    /**
+     * @return {import("./Base.js").BackgroundColor} Background color.
+     * @function
+     * @api
+     */
+    this.getBackground;
+
+    /**
+     * @param {import("./Base.js").BackgroundColor} background Background color.
+     * @function
+     * @api
+     */
+    this.setBackground;
   }
 
-  /**
-   * Create a renderer for this layer.
-   * @return {import("../renderer/Layer.js").default} A layer renderer.
-   * @protected
-   */
   createRenderer() {
     return new CanvasVectorTileLayerRenderer(this);
   }
@@ -162,12 +171,12 @@ class VectorTileLayer extends BaseVectorLayer {
    * when a hit was detected, or it will be empty.
    *
    * The hit detection algorithm used for this method is optimized for performance, but is less
-   * accurate than the one used in {@link import("../PluggableMap.js").default#getFeaturesAtPixel map.getFeaturesAtPixel()}: Text
-   * is not considered, and icons are only represented by their bounding box instead of the exact
+   * accurate than the one used in [map.getFeaturesAtPixel()]{@link import("../Map.js").default#getFeaturesAtPixel}.
+   * Text is not considered, and icons are only represented by their bounding box instead of the exact
    * image.
    *
    * @param {import("../pixel.js").Pixel} pixel Pixel.
-   * @return {Promise<Array<import("../Feature").default>>} Promise that resolves with an array of features.
+   * @return {Promise<Array<import("../Feature").FeatureLike>>} Promise that resolves with an array of features.
    * @api
    */
   getFeatures(pixel) {
@@ -175,7 +184,7 @@ class VectorTileLayer extends BaseVectorLayer {
   }
 
   /**
-   * @return {import("./VectorTileRenderType.js").default} The render mode.
+   * @return {VectorTileRenderType} The render mode.
    */
   getRenderMode() {
     return this.renderMode_;

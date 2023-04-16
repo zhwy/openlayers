@@ -1,6 +1,5 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import {Circle as CircleStyle, Fill, Stroke, Style} from '../src/ol/style.js';
 import {Draw, Modify, Select, Snap} from '../src/ol/interaction.js';
 import {OSM, Vector as VectorSource} from '../src/ol/source.js';
 import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
@@ -11,21 +10,13 @@ const raster = new TileLayer({
 
 const vector = new VectorLayer({
   source: new VectorSource(),
-  style: new Style({
-    fill: new Fill({
-      color: 'rgba(255, 255, 255, 0.2)',
-    }),
-    stroke: new Stroke({
-      color: '#ffcc33',
-      width: 2,
-    }),
-    image: new CircleStyle({
-      radius: 7,
-      fill: new Fill({
-        color: '#ffcc33',
-      }),
-    }),
-  }),
+  style: {
+    'fill-color': 'rgba(255, 255, 255, 0.2)',
+    'stroke-color': '#ffcc33',
+    'stroke-width': 2,
+    'circle-radius': 7,
+    'circle-fill-color': '#ffcc33',
+  },
 });
 
 const map = new Map({
@@ -94,18 +85,16 @@ const ExampleDraw = {
     source: vector.getSource(),
     type: 'Circle',
   }),
-  getActive: function () {
-    return this.activeType ? this[this.activeType].getActive() : false;
-  },
+  activeDraw: null,
   setActive: function (active) {
-    const type = optionsForm.elements['draw-type'].value;
+    if (this.activeDraw) {
+      this.activeDraw.setActive(false);
+      this.activeDraw = null;
+    }
     if (active) {
-      this.activeType && this[this.activeType].setActive(false);
-      this[type].setActive(true);
-      this.activeType = type;
-    } else {
-      this.activeType && this[this.activeType].setActive(false);
-      this.activeType = null;
+      const type = optionsForm.elements['draw-type'].value;
+      this.activeDraw = this[type];
+      this.activeDraw.setActive(true);
     }
   },
 };
@@ -117,14 +106,16 @@ ExampleDraw.init();
  */
 optionsForm.onchange = function (e) {
   const type = e.target.getAttribute('name');
-  const value = e.target.value;
   if (type == 'draw-type') {
-    ExampleDraw.getActive() && ExampleDraw.setActive(true);
+    ExampleModify.setActive(false);
+    ExampleDraw.setActive(true);
+    optionsForm.elements['interaction'].value = 'draw';
   } else if (type == 'interaction') {
-    if (value == 'modify') {
+    const interactionType = e.target.value;
+    if (interactionType == 'modify') {
       ExampleDraw.setActive(false);
       ExampleModify.setActive(true);
-    } else if (value == 'draw') {
+    } else if (interactionType == 'draw') {
       ExampleDraw.setActive(true);
       ExampleModify.setActive(false);
     }

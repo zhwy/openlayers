@@ -1,7 +1,6 @@
 import Feature from '../src/ol/Feature.js';
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import {Fill, Icon, Stroke, Style} from '../src/ol/style.js';
 import {LineString, Point, Polygon} from '../src/ol/geom.js';
 import {
   Pointer as PointerInteraction,
@@ -131,7 +130,7 @@ const polygonFeature = new Feature(
 );
 
 const key =
-  'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiY2pzbmg0Nmk5MGF5NzQzbzRnbDNoeHJrbiJ9.7_-_gL8ur7ZtEiNwRfCy7Q';
+  'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiY2t0cGdwMHVnMGdlbzMxbDhwazBic2xrNSJ9.WbcTL9uj8JPAsnT9mgb7oQ';
 
 const map = new Map({
   interactions: defaultInteractions().extend([new Drag()]),
@@ -147,22 +146,16 @@ const map = new Map({
       source: new VectorSource({
         features: [pointFeature, lineFeature, polygonFeature],
       }),
-      style: new Style({
-        image: new Icon({
-          anchor: [0.5, 46],
-          anchorXUnits: 'fraction',
-          anchorYUnits: 'pixels',
-          opacity: 0.95,
-          src: 'data/icon.png',
-        }),
-        stroke: new Stroke({
-          width: 3,
-          color: [255, 0, 0, 1],
-        }),
-        fill: new Fill({
-          color: [0, 0, 255, 0.6],
-        }),
-      }),
+      style: {
+        'icon-src': 'data/icon.png',
+        'icon-opacity': 0.95,
+        'icon-anchor': [0.5, 46],
+        'icon-anchor-x-units': 'fraction',
+        'icon-anchor-y-units': 'pixels',
+        'stroke-width': 3,
+        'stroke-color': [255, 0, 0, 1],
+        'fill-color': [0, 0, 255, 0.6],
+      },
     }),
   ],
   target: 'map',

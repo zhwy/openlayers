@@ -2,23 +2,28 @@
  * @module ol/layer/WebGLTile
  */
 import BaseTileLayer from './BaseTile.js';
+import LayerProperty from '../layer/Property.js';
 import WebGLTileLayerRenderer, {
   Attributes,
   Uniforms,
 } from '../renderer/webgl/TileLayer.js';
 import {
+  PALETTE_TEXTURE_ARRAY,
   ValueTypes,
   expressionToGlsl,
   getStringNumberEquivalent,
   uniformNameForVariable,
 } from '../style/expressions.js';
-import {assign} from '../obj.js';
+
+/**
+ * @typedef {import("../source/DataTile.js").default|import("../source/TileImage.js").default} SourceType
+ */
 
 /**
  * @typedef {Object} Style
  * Translates tile data to rendered pixels.
  *
- * @property {Object<string, number>} [variables] Style variables.  Each variable must hold a number.  These
+ * @property {Object<string, (string|number)>} [variables] Style variables.  Each variable must hold a number or string.  These
  * variables can be used in the `color`, `brightness`, `contrast`, `exposure`, `saturation` and `gamma`
  * {@link import("../style/expressions.js").ExpressionValue expressions}, using the `['var', 'varName']` operator.
  * To update style variables, use the {@link import("./WebGLTile.js").default#updateStyleVariables} method.
@@ -57,12 +62,19 @@ import {assign} from '../obj.js';
  * be visible.
  * @property {number} [preload=0] Preload. Load low-resolution tiles up to `preload` levels. `0`
  * means no preloading.
- * @property {import("../source/Tile.js").default} [source] Source for this layer.
- * @property {import("../PluggableMap.js").default} [map] Sets the layer as overlay on a map. The map will not manage
+ * @property {SourceType} [source] Source for this layer.
+ * @property {Array<SourceType>|function(import("../extent.js").Extent, number):Array<SourceType>} [sources] Array
+ * of sources for this layer. Takes precedence over `source`. Can either be an array of sources, or a function that
+ * expects an extent and a resolution (in view projection units per pixel) and returns an array of sources. See
+ * {@link module:ol/source.sourcesFromTileGrid} for a helper function to generate sources that are organized in a
+ * pyramid following the same pattern as a tile grid. **Note:** All sources must have the same band count and content.
+ * @property {import("../Map.js").default} [map] Sets the layer as overlay on a map. The map will not manage
  * this layer in its layers collection, and the layer will be rendered on top. This is useful for
  * temporary layers. The standard way to add a layer to a map and have it managed by the map is to
- * use {@link module:ol/Map#addLayer}.
+ * use {@link module:ol/Map~Map#addLayer}.
  * @property {boolean} [useInterimTilesOnError=true] Use interim tiles on error.
+ * @property {number} [cacheSize=512] The internal texture cache size.  This needs to be large enough to render
+ * two zoom levels worth of tiles.
  */
 
 /**
@@ -70,6 +82,7 @@ import {assign} from '../obj.js';
  * @property {string} vertexShader The vertex shader.
  * @property {string} fragmentShader The fragment shader.
  * @property {Object<string,import("../webgl/Helper.js").UniformValue>} uniforms Uniform definitions.
+ * @property {Array<import("../webgl/PaletteTexture.js").default>} paletteTextures Palette textures.
  */
 
 /**
@@ -81,12 +94,22 @@ function parseStyle(style, bandCount) {
   const vertexShader = `
     attribute vec2 ${Attributes.TEXTURE_COORD};
     uniform mat4 ${Uniforms.TILE_TRANSFORM};
+    uniform float ${Uniforms.TEXTURE_PIXEL_WIDTH};
+    uniform float ${Uniforms.TEXTURE_PIXEL_HEIGHT};
+    uniform float ${Uniforms.TEXTURE_RESOLUTION};
+    uniform float ${Uniforms.TEXTURE_ORIGIN_X};
+    uniform float ${Uniforms.TEXTURE_ORIGIN_Y};
     uniform float ${Uniforms.DEPTH};
 
     varying vec2 v_textureCoord;
+    varying vec2 v_mapCoord;
 
     void main() {
       v_textureCoord = ${Attributes.TEXTURE_COORD};
+      v_mapCoord = vec2(
+        ${Uniforms.TEXTURE_ORIGIN_X} + ${Uniforms.TEXTURE_RESOLUTION} * ${Uniforms.TEXTURE_PIXEL_WIDTH} * v_textureCoord[0],
+        ${Uniforms.TEXTURE_ORIGIN_Y} - ${Uniforms.TEXTURE_RESOLUTION} * ${Uniforms.TEXTURE_PIXEL_HEIGHT} * v_textureCoord[1]
+      );
       gl_Position = ${Uniforms.TILE_TRANSFORM} * vec4(${Attributes.TEXTURE_COORD}, ${Uniforms.DEPTH}, 1.0);
     }
   `;
@@ -99,6 +122,7 @@ function parseStyle(style, bandCount) {
     variables: [],
     attributes: [],
     stringLiteralsMap: {},
+    functions: {},
     bandCount: bandCount,
   };
 
@@ -197,14 +221,21 @@ function parseStyle(style, bandCount) {
   });
 
   const textureCount = Math.ceil(bandCount / 4);
-  const colorAssignments = new Array(textureCount);
-  for (let textureIndex = 0; textureIndex < textureCount; ++textureIndex) {
-    const uniformName = Uniforms.TILE_TEXTURE_PREFIX + textureIndex;
-    uniformDeclarations.push(`uniform sampler2D ${uniformName};`);
-    colorAssignments[
-      textureIndex
-    ] = `vec4 color${textureIndex} = texture2D(${uniformName}, v_textureCoord);`;
+  uniformDeclarations.push(
+    `uniform sampler2D ${Uniforms.TILE_TEXTURE_ARRAY}[${textureCount}];`
+  );
+
+  if (context.paletteTextures) {
+    uniformDeclarations.push(
+      `uniform sampler2D ${PALETTE_TEXTURE_ARRAY}[${context.paletteTextures.length}];`
+    );
   }
+
+  const functionDefintions = Object.keys(context.functions).map(function (
+    name
+  ) {
+    return context.functions[name];
+  });
 
   const fragmentShader = `
     #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -214,6 +245,8 @@ function parseStyle(style, bandCount) {
     #endif
 
     varying vec2 v_textureCoord;
+    varying vec2 v_mapCoord;
+    uniform vec4 ${Uniforms.RENDER_EXTENT};
     uniform float ${Uniforms.TRANSITION_ALPHA};
     uniform float ${Uniforms.TEXTURE_PIXEL_WIDTH};
     uniform float ${Uniforms.TEXTURE_PIXEL_HEIGHT};
@@ -222,10 +255,21 @@ function parseStyle(style, bandCount) {
 
     ${uniformDeclarations.join('\n')}
 
-    void main() {
-      ${colorAssignments.join('\n')}
+    ${functionDefintions.join('\n')}
 
-      vec4 color = color0;
+    void main() {
+      if (
+        v_mapCoord[0] < ${Uniforms.RENDER_EXTENT}[0] ||
+        v_mapCoord[1] < ${Uniforms.RENDER_EXTENT}[1] ||
+        v_mapCoord[0] > ${Uniforms.RENDER_EXTENT}[2] ||
+        v_mapCoord[1] > ${Uniforms.RENDER_EXTENT}[3]
+      ) {
+        discard;
+      }
+
+      vec4 color = texture2D(${
+        Uniforms.TILE_TEXTURE_ARRAY
+      }[0],  v_textureCoord);
 
       ${pipeline.join('\n')}
 
@@ -242,6 +286,7 @@ function parseStyle(style, bandCount) {
     vertexShader: vertexShader,
     fragmentShader: fragmentShader,
     uniforms: uniforms,
+    paletteTextures: context.paletteTextures,
   };
 }
 
@@ -253,46 +298,213 @@ function parseStyle(style, bandCount) {
  * property on the layer object; for example, setting `title: 'My Title'` in the
  * options means that `title` is observable, and has get/set accessors.
  *
- * @extends BaseTileLayer<import("../source/DataTile.js").default|import("../source/TileImage.js").default>
+ * @extends BaseTileLayer<SourceType, WebGLTileLayerRenderer>
+ * @fires import("../render/Event.js").RenderEvent
  * @api
  */
 class WebGLTileLayer extends BaseTileLayer {
   /**
-   * @param {Options} opt_options Tile layer options.
+   * @param {Options} options Tile layer options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? assign({}, opt_options) : {};
+  constructor(options) {
+    options = options ? Object.assign({}, options) : {};
 
     const style = options.style || {};
     delete options.style;
+
+    const cacheSize = options.cacheSize;
+    delete options.cacheSize;
+
     super(options);
 
     /**
+     * @type {Array<SourceType>|function(import("../extent.js").Extent, number):Array<SourceType>}
+     * @private
+     */
+    this.sources_ = options.sources;
+
+    /**
+     * @type {SourceType|null}
+     * @private
+     */
+    this.renderedSource_ = null;
+
+    /**
+     * @type {number}
+     * @private
+     */
+    this.renderedResolution_ = NaN;
+
+    /**
      * @type {Style}
+     * @private
      */
     this.style_ = style;
+
+    /**
+     * @type {number}
+     * @private
+     */
+    this.cacheSize_ = cacheSize;
+
+    /**
+     * @type {Object<string, (string|number)>}
+     * @private
+     */
+    this.styleVariables_ = this.style_.variables || {};
+
+    this.addChangeListener(LayerProperty.SOURCE, this.handleSourceUpdate_);
   }
 
   /**
-   * Create a renderer for this layer.
-   * @return {import("../renderer/Layer.js").default} A layer renderer.
-   * @protected
+   * Gets the sources for this layer, for a given extent and resolution.
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @return {Array<SourceType>} Sources.
    */
-  createRenderer() {
+  getSources(extent, resolution) {
     const source = this.getSource();
-    const parsedStyle = parseStyle(
-      this.style_,
-      'bandCount' in source ? source.bandCount : 4
-    );
+    return this.sources_
+      ? typeof this.sources_ === 'function'
+        ? this.sources_(extent, resolution)
+        : this.sources_
+      : source
+      ? [source]
+      : [];
+  }
 
-    this.styleVariables_ = this.style_.variables || {};
+  /**
+   * @return {SourceType} The source being rendered.
+   */
+  getRenderSource() {
+    return this.renderedSource_ || this.getSource();
+  }
+
+  /**
+   * @return {import("../source/Source.js").State} Source state.
+   */
+  getSourceState() {
+    const source = this.getRenderSource();
+    return source ? source.getState() : 'undefined';
+  }
+
+  /**
+   * @private
+   */
+  handleSourceUpdate_() {
+    if (this.hasRenderer()) {
+      this.getRenderer().clearCache();
+    }
+    if (this.getSource()) {
+      this.setStyle(this.style_);
+    }
+  }
+
+  /**
+   * @private
+   * @return {number} The number of source bands.
+   */
+  getSourceBandCount_() {
+    const max = Number.MAX_SAFE_INTEGER;
+    const sources = this.getSources([-max, -max, max, max], max);
+    return sources && sources.length && 'bandCount' in sources[0]
+      ? sources[0].bandCount
+      : 4;
+  }
+
+  createRenderer() {
+    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
 
     return new WebGLTileLayerRenderer(this, {
       vertexShader: parsedStyle.vertexShader,
       fragmentShader: parsedStyle.fragmentShader,
       uniforms: parsedStyle.uniforms,
-      className: this.getClassName(),
+      cacheSize: this.cacheSize_,
+      paletteTextures: parsedStyle.paletteTextures,
     });
+  }
+
+  /**
+   * @param {import("../Map").FrameState} frameState Frame state.
+   * @param {Array<SourceType>} sources Sources.
+   * @return {HTMLElement} Canvas.
+   */
+  renderSources(frameState, sources) {
+    const layerRenderer = this.getRenderer();
+    let canvas;
+    for (let i = 0, ii = sources.length; i < ii; ++i) {
+      this.renderedSource_ = sources[i];
+      if (layerRenderer.prepareFrame(frameState)) {
+        canvas = layerRenderer.renderFrame(frameState);
+      }
+    }
+    return canvas;
+  }
+
+  /**
+   * @param {?import("../Map.js").FrameState} frameState Frame state.
+   * @param {HTMLElement} target Target which the renderer may (but need not) use
+   * for rendering its content.
+   * @return {HTMLElement} The rendered element.
+   */
+  render(frameState, target) {
+    this.rendered = true;
+    const viewState = frameState.viewState;
+    const sources = this.getSources(frameState.extent, viewState.resolution);
+    let ready = true;
+    for (let i = 0, ii = sources.length; i < ii; ++i) {
+      const source = sources[i];
+      const sourceState = source.getState();
+      if (sourceState == 'loading') {
+        const onChange = () => {
+          if (source.getState() == 'ready') {
+            source.removeEventListener('change', onChange);
+            this.changed();
+          }
+        };
+        source.addEventListener('change', onChange);
+      }
+      ready = ready && sourceState == 'ready';
+    }
+    const canvas = this.renderSources(frameState, sources);
+    if (this.getRenderer().renderComplete && ready) {
+      // Fully rendered, done.
+      this.renderedResolution_ = viewState.resolution;
+      return canvas;
+    }
+    // Render sources from previously fully rendered frames
+    if (this.renderedResolution_ > 0.5 * viewState.resolution) {
+      const altSources = this.getSources(
+        frameState.extent,
+        this.renderedResolution_
+      ).filter((source) => !sources.includes(source));
+      if (altSources.length > 0) {
+        return this.renderSources(frameState, altSources);
+      }
+    }
+    return canvas;
+  }
+
+  /**
+   * Update the layer style.  The `updateStyleVariables` function is a more efficient
+   * way to update layer rendering.  In cases where the whole style needs to be updated,
+   * this method may be called instead.  Note that calling this method will also replace
+   * any previously set variables, so the new style also needs to include new variables,
+   * if needed.
+   * @param {Style} style The new style.
+   */
+  setStyle(style) {
+    this.styleVariables_ = style.variables || {};
+    this.style_ = style;
+    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
+    const renderer = this.getRenderer();
+    renderer.reset({
+      vertexShader: parsedStyle.vertexShader,
+      fragmentShader: parsedStyle.fragmentShader,
+      uniforms: parsedStyle.uniforms,
+      paletteTextures: parsedStyle.paletteTextures,
+    });
+    this.changed();
   }
 
   /**
@@ -301,9 +513,16 @@ class WebGLTileLayer extends BaseTileLayer {
    * @api
    */
   updateStyleVariables(variables) {
-    assign(this.styleVariables_, variables);
+    Object.assign(this.styleVariables_, variables);
     this.changed();
   }
 }
+
+/**
+ * Clean up underlying WebGL resources.
+ * @function
+ * @api
+ */
+WebGLTileLayer.prototype.dispose;
 
 export default WebGLTileLayer;

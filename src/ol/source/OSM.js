@@ -23,7 +23,8 @@ export const ATTRIBUTION =
  * @property {null|string} [crossOrigin='anonymous'] The `crossOrigin` attribute for loaded images.  Note that
  * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
  * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
- * @property {boolean} [imageSmoothing=true] Enable image smoothing.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
  * @property {number} [maxZoom=19] Max zoom.
  * @property {boolean} [opaque=true] Whether the layer is opaque.
  * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
@@ -36,7 +37,7 @@ export const ATTRIBUTION =
  * ```
  * @property {number} [transition=250] Duration of the opacity transition for rendering.
  * To disable the opacity transition, pass `transition: 0`.
- * @property {string} [url='https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'] URL template.
+ * @property {string} [url='https://tile.openstreetmap.org/{z}/{x}/{y}.png'] URL template.
  * Must include `{x}`, `{y}` or `{-y}`, and `{z}` placeholders.
  * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
  * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
@@ -51,10 +52,10 @@ export const ATTRIBUTION =
  */
 class OSM extends XYZ {
   /**
-   * @param {Options} [opt_options] Open Street Map options.
+   * @param {Options} [options] Open Street Map options.
    */
-  constructor(opt_options) {
-    const options = opt_options || {};
+  constructor(options) {
+    options = options || {};
 
     let attributions;
     if (options.attributions !== undefined) {
@@ -69,14 +70,14 @@ class OSM extends XYZ {
     const url =
       options.url !== undefined
         ? options.url
-        : 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     super({
       attributions: attributions,
       attributionsCollapsible: false,
       cacheSize: options.cacheSize,
       crossOrigin: crossOrigin,
-      imageSmoothing: options.imageSmoothing,
+      interpolate: options.interpolate,
       maxZoom: options.maxZoom !== undefined ? options.maxZoom : 19,
       opaque: options.opaque !== undefined ? options.opaque : true,
       reprojectionErrorThreshold: options.reprojectionErrorThreshold,
