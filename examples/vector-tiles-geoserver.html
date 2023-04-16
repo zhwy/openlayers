@@ -7,6 +7,22 @@ docs: >
 tags: "vector tiles, zwy"
 ---
 
+<style>
+  .map {
+    position: relative;
+  }
+
+  #info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    max-height: 200px;
+    width: 100px;
+    overflow: auto;
+    z-index: 99;
+  }
+</style>
+
 <div id="map" class="map">
-  <pre id="info" />
+  <div id="info"></div>
 </div>
