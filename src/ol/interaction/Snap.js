@@ -47,7 +47,7 @@ import {listen, unlistenByKey} from '../events.js';
 
 /**
  * @param  {import("../source/Vector.js").VectorSourceEvent|import("../Collection.js").CollectionEvent<import("../Feature.js").default>} evt Event.
- * @return {import("../Feature.js").default} Feature.
+ * @return {import("../Feature.js").default|null} Feature.
  */
 function getFeatureFromEvent(evt) {
   if (
@@ -55,7 +55,8 @@ function getFeatureFromEvent(evt) {
   ) {
     return /** @type {import("../source/Vector.js").VectorSourceEvent} */ (evt)
       .feature;
-  } else if (
+  }
+  if (
     /** @type {import("../Collection.js").CollectionEvent<import("../Feature.js").default>} */ (
       evt
     ).element
@@ -64,6 +65,7 @@ function getFeatureFromEvent(evt) {
       evt
     ).element;
   }
+  return null;
 }
 
 const tempSegment = [];
@@ -244,22 +246,6 @@ class Snap extends PointerInteraction {
   }
 
   /**
-   * @param {import("../Feature.js").default} feature Feature.
-   * @private
-   */
-  forEachFeatureAdd_(feature) {
-    this.addFeature(feature);
-  }
-
-  /**
-   * @param {import("../Feature.js").default} feature Feature.
-   * @private
-   */
-  forEachFeatureRemove_(feature) {
-    this.removeFeature(feature);
-  }
-
-  /**
    * @return {import("../Collection.js").default<import("../Feature.js").default>|Array<import("../Feature.js").default>} Features.
    * @private
    */
@@ -293,7 +279,9 @@ class Snap extends PointerInteraction {
    */
   handleFeatureAdd_(evt) {
     const feature = getFeatureFromEvent(evt);
-    this.addFeature(feature);
+    if (feature) {
+      this.addFeature(feature);
+    }
   }
 
   /**
@@ -302,7 +290,9 @@ class Snap extends PointerInteraction {
    */
   handleFeatureRemove_(evt) {
     const feature = getFeatureFromEvent(evt);
-    this.removeFeature(feature);
+    if (feature) {
+      this.removeFeature(feature);
+    }
   }
 
   /**
@@ -381,7 +371,9 @@ class Snap extends PointerInteraction {
     if (currentMap) {
       keys.forEach(unlistenByKey);
       keys.length = 0;
-      features.forEach(this.forEachFeatureRemove_.bind(this));
+      this.rBush_.clear();
+      Object.values(this.featureChangeListenerKeys_).forEach(unlistenByKey);
+      this.featureChangeListenerKeys_ = {};
     }
     super.setMap(map);
 
@@ -417,7 +409,7 @@ class Snap extends PointerInteraction {
           )
         );
       }
-      features.forEach(this.forEachFeatureAdd_.bind(this));
+      features.forEach((feature) => this.addFeature(feature));
     }
   }
 

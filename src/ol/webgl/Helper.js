@@ -49,7 +49,7 @@ export const DefaultUniform = {
   TIME: 'u_time',
   ZOOM: 'u_zoom',
   RESOLUTION: 'u_resolution',
-  SIZE_PX: 'u_sizePx',
+  VIEWPORT_SIZE_PX: 'u_viewportSizePx',
   PIXEL_RATIO: 'u_pixelRatio',
 };
 
@@ -578,6 +578,19 @@ class WebGLHelper extends Disposable {
   }
 
   /**
+   * Prepare a program to use a texture.
+   * @param {WebGLTexture} texture The texture.
+   * @param {number} slot The texture slot.
+   * @param {string} uniformName The corresponding uniform name.
+   */
+  bindTexture(texture, slot, uniformName) {
+    const gl = this.getGL();
+    gl.activeTexture(gl.TEXTURE0 + slot);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(this.getUniformLocation(uniformName), slot);
+  }
+
+  /**
    * Clear the render target & bind it for future draw operations.
    * This is similar to `prepareDraw`, only post processes will not be applied.
    * Note: the whole viewport will be drawn to the render target, regardless of its size.
@@ -691,7 +704,10 @@ class WebGLHelper extends Disposable {
       frameState.viewState.resolution
     );
     this.setUniformFloatValue(DefaultUniform.PIXEL_RATIO, pixelRatio);
-    this.setUniformFloatVec2(DefaultUniform.SIZE_PX, [size[0], size[1]]);
+    this.setUniformFloatVec2(DefaultUniform.VIEWPORT_SIZE_PX, [
+      size[0],
+      size[1],
+    ]);
   }
 
   /**
@@ -857,8 +873,8 @@ class WebGLHelper extends Disposable {
     gl.deleteShader(vertexShader);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      const message = `GL program linking failed: ${gl.getShaderInfoLog(
-        vertexShader
+      const message = `GL program linking failed: ${gl.getProgramInfoLog(
+        program
       )}`;
       throw new Error(message);
     }
@@ -897,8 +913,8 @@ class WebGLHelper extends Disposable {
   }
 
   /**
-   * Modifies the given transform to apply the rotation/translation/scaling of the given frame state.
-   * The resulting transform can be used to convert world space coordinates to view coordinates.
+   * Sets the given transform to apply the rotation/translation/scaling of the given frame state.
+   * The resulting transform can be used to convert world space coordinates to view coordinates in the [-1, 1] range.
    * @param {import("../Map.js").FrameState} frameState Frame state.
    * @param {import("../transform").Transform} transform Transform to update.
    * @return {import("../transform").Transform} The updated transform object.
@@ -908,8 +924,6 @@ class WebGLHelper extends Disposable {
     const rotation = frameState.viewState.rotation;
     const resolution = frameState.viewState.resolution;
     const center = frameState.viewState.center;
-
-    resetTransform(transform);
     composeTransform(
       transform,
       0,

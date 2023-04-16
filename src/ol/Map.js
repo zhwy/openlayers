@@ -54,7 +54,7 @@ import {warn} from './console.js';
  * @property {boolean} animate Animate.
  * @property {import("./transform.js").Transform} coordinateToPixelTransform CoordinateToPixelTransform.
  * @property {import("rbush").default} declutterTree DeclutterTree.
- * @property {null|import("./extent.js").Extent} extent Extent.
+ * @property {null|import("./extent.js").Extent} extent Extent (in view projection coordinates).
  * @property {import("./extent.js").Extent} [nextExtent] Next extent during an animation series.
  * @property {number} index Index.
  * @property {Array<import("./layer/Layer.js").State>} layerStatesArray LayerStatesArray.
@@ -1259,6 +1259,7 @@ class Map extends BaseObject {
       if (rootNode instanceof ShadowRoot) {
         this.resizeObserver_.unobserve(rootNode.host);
       }
+      this.setSize(undefined);
     }
 
     // target may be undefined, null, a string or an Element.

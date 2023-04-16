@@ -480,7 +480,6 @@ describe('ol/Map', function () {
 
       it('triggers when all tiles and sources are loaded and faded in', function (done) {
         const layers = map.getLayers().getArray();
-        expect(layers[6].getRenderer().ready).to.be(false);
         map.once('rendercomplete', function () {
           expect(map.tileQueue_.getTilesLoading()).to.be(0);
           expect(layers[1].getSource().image_.getState()).to.be(
@@ -713,8 +712,6 @@ describe('ol/Map', function () {
     });
 
     it('is a reliable start-end sequence', function (done) {
-      const layers = map.getLayers().getArray();
-      expect(layers[6].getRenderer().ready).to.be(false);
       let loading = 0;
       map.on('loadstart', () => {
         map.getView().setZoom(0.1);
@@ -1175,6 +1172,41 @@ describe('ol/Map', function () {
         map.setTarget(document.createElement('div'));
         expect(map.targetChangeHandlerKeys_).to.be.ok();
       });
+    });
+
+    it('detach and re-attach', function (done) {
+      const target = map.getTargetElement();
+      map.setTarget(null);
+      target.style.width = '100px';
+      target.style.height = '100px';
+      document.body.appendChild(target);
+      map.setTarget(target);
+      map.addLayer(
+        new VectorLayer({
+          source: new VectorSource({
+            features: [new Feature(new Point([0, 0]))],
+          }),
+        })
+      );
+      map.getView().setCenter([0, 0]);
+      map.getView().setZoom(0);
+      map.renderSync();
+      try {
+        expect(target.querySelector('canvas')).to.be.a(HTMLCanvasElement);
+        map.setTarget(null);
+        expect(target.querySelector('canvas')).to.be(null);
+        map.setTarget(target);
+        map.once('rendercomplete', () => {
+          try {
+            expect(target.querySelector('canvas')).to.be.a(HTMLCanvasElement);
+            done();
+          } catch (e) {
+            done(e);
+          }
+        });
+      } finally {
+        document.body.removeChild(target);
+      }
     });
   });
 

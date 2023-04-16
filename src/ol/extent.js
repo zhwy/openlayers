@@ -809,6 +809,9 @@ export function intersectsSegment(extent, start, end) {
  * @api
  */
 export function applyTransform(extent, transformFn, dest, stops) {
+  if (isEmpty(extent)) {
+    return createOrUpdateEmpty(dest);
+  }
   let coordinates = [];
   if (stops > 1) {
     const width = extent[2] - extent[0];
@@ -899,13 +902,15 @@ export function wrapAndSliceX(extent, projection) {
     if (getWidth(extent) > worldWidth) {
       // the extent wraps around on itself
       return [[projectionExtent[0], extent[1], projectionExtent[2], extent[3]]];
-    } else if (extent[0] < projectionExtent[0]) {
+    }
+    if (extent[0] < projectionExtent[0]) {
       // the extent crosses the anti meridian, so it needs to be sliced
       return [
         [extent[0] + worldWidth, extent[1], projectionExtent[2], extent[3]],
         [projectionExtent[0], extent[1], extent[2], extent[3]],
       ];
-    } else if (extent[2] > projectionExtent[2]) {
+    }
+    if (extent[2] > projectionExtent[2]) {
       // the extent crosses the anti meridian, so it needs to be sliced
       return [
         [extent[0], extent[1], projectionExtent[2], extent[3]],
