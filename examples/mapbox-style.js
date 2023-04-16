@@ -8,9 +8,7 @@ import TileLayer from 'ol/layer/Tile';
 import XYZ from 'ol/source/XYZ';
 import TileDebug from "../src/ol/source/TileDebug.js";
 import * as olProj from 'ol/proj';
-import { defaultResolutions } from 'ol-mapbox-style/dist/util.js';
 import FullScreen from '../src/ol/control/FullScreen.js';
-import olms from 'ol-mapbox-style';
 
 // original example
 // apply(
@@ -19,6 +17,8 @@ import olms from 'ol-mapbox-style';
 // ).then(function (map) {
 //     map.addControl(new FullScreen());
 // });
+
+const defaultResolutions = [];
 
 const maxResolution = 360 / 512;
 defaultResolutions.length = 14;
