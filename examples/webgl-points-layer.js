@@ -139,20 +139,6 @@ const map = new Map({
     zoom: 2,
   }),
 });
-map.on("click", function (evt) {
-  const feature = map.getFeaturesAtPixel(evt.pixel)[0];
-  if (feature) {
-    console.log(feature);
-  }
-});
-map.on("pointermove", function (evt) {
-  const hasFeature = map.hasFeatureAtPixel(evt.pixel);
-  if (hasFeature) {
-    document.getElementById("map").style.cursor = "pointer";
-  } else {
-    document.getElementById("map").style.cursor = "default";
-  }
-});
 
 let literalStyle;
 let pointsLayer;
@@ -211,7 +197,7 @@ editor.addEventListener("input", function () {
 });
 
 const select = document.getElementById("style-select");
-select.value = "my-circles";
+select.value = "circles";
 function onSelectChange() {
   const style = select.value;
   const newLiteralStyle = predefinedStyles[style];
