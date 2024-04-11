@@ -178,7 +178,6 @@ function refreshLayer(newStyle) {
     source: vectorSource,
     style: newStyle,
   });
-  debugger;
   map.addLayer(pointsLayer);
 
   if (previousLayer) {

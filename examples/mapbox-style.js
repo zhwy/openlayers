@@ -9,7 +9,7 @@ import TileLayer from "ol/layer/Tile";
 import XYZ from "ol/source/XYZ";
 import TileDebug from "../src/ol/source/TileDebug.js";
 import * as olProj from "ol/proj";
-import { defaultResolutions } from "ol-mapbox-style/dist/util.js";
+// import { defaultResolutions } from "ol-mapbox-style/dist/util.js";
 
 // original example
 // olms(

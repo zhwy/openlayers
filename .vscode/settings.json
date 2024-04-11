@@ -2,5 +2,7 @@
   "typescript.preferences.quoteStyle": "double",
   "javascript.preferences.quoteStyle": "double",
   "editor.formatOnSave": false,
-  "eslint.enable": false
+  "eslint.enable": false,
+  "editor.tabSize": 2,
+  "editor.detectIndentation": true
 }
