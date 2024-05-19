@@ -61,7 +61,7 @@ function writeLineSegmentToBuffers(
   currentAngleTangentSum
 ) {
   // compute the stride to determine how many vertices were already pushed
-  const baseVertexAttrsCount = 10; // base attributes: x0, y0, x1, y1, timeoffset0, timeoffset1, angle0, angle1, distance, params
+  const baseVertexAttrsCount = 9; // base attributes: x0, y0, x1, y1, timeoffset, angle0, angle1, distance, params
   const stride = baseVertexAttrsCount + customAttributes.length;
   const baseIndex = vertexArray.length / stride;
 
@@ -171,8 +171,7 @@ function writeLineSegmentToBuffers(
     angle1,
     currentLength,
     computeParameters(0, currentAngleTangentSum),
-    timeoffset0,
-    timeoffset0 // 这个值在着色器中不使用
+    timeoffset0
   );
   vertexArray.push(...customAttributes);
 
@@ -185,7 +184,6 @@ function writeLineSegmentToBuffers(
     angle1,
     currentLength,
     computeParameters(1, currentAngleTangentSum),
-    timeoffset0,
     timeoffset0
   );
   vertexArray.push(...customAttributes);
@@ -199,7 +197,6 @@ function writeLineSegmentToBuffers(
     angle1,
     currentLength,
     computeParameters(2, currentAngleTangentSum),
-    timeoffset1,
     timeoffset1
   );
   vertexArray.push(...customAttributes);
@@ -213,7 +210,6 @@ function writeLineSegmentToBuffers(
     angle1,
     currentLength,
     computeParameters(3, currentAngleTangentSum),
-    timeoffset1,
     timeoffset1
   );
   vertexArray.push(...customAttributes);

@@ -10,7 +10,7 @@ import { COMMON_HEADER, ShaderBuilder } from "../src/ol/webgl/ShaderBuilder.js";
 import Feature from "../src/ol/Feature.js";
 import { LineString } from "../src/ol/geom.js";
 import { LINESTRING_ANGLE_COSINE_CUTOFF } from "../src/ol/render/webgl/utils.js";
-import { stringToGlsl } from "../src/ol/expr/gpu.js";
+import { stringToGlsl, uniformNameForVariable } from "../src/ol/expr/gpu.js";
 import VectorStyleRenderer from "../src/ol/render/webgl/VectorStyleRenderer.js";
 import { getCustomAttributesSize } from "../src/ol/render/webgl/renderinstructions.js";
 import { create as createWebGLWorker } from "../src/ol/worker/custom-flow-line-worker.js";
@@ -36,6 +36,8 @@ class CustomShaderBuilder extends ShaderBuilder {
     super();
 
     this.hasStroke_ = true;
+    this.strokePathDuration_ = "0.";
+    this.strokePathStartTime_ = "0.";
   }
 
   getStrokeVertexShader() {
@@ -57,7 +59,7 @@ class CustomShaderBuilder extends ShaderBuilder {
       attribute float a_distance;
       attribute vec2 a_joinAngles;
       attribute vec4 a_prop_hitColor;
-      attribute float a_time_offset0;
+      attribute float a_time_offset;
       attribute float a_time_offset1;
       ${this.attributes_
         .map(function (attribute) {
@@ -71,8 +73,7 @@ class CustomShaderBuilder extends ShaderBuilder {
       varying float v_width;
       varying vec4 v_prop_hitColor;
       varying float v_distanceOffsetPx;
-      varying float v_time_offset0;
-      varying float v_time_offset1;
+      varying float v_time_offset;
       varying float v_time;
       ${this.varyings_
         .map(function (varying) {
@@ -151,8 +152,7 @@ class CustomShaderBuilder extends ShaderBuilder {
         v_prop_hitColor = a_prop_hitColor;
         v_distanceOffsetPx = a_distance / u_resolution - (lineOffsetPx * angleTangentSum);
 
-        v_time_offset0 = a_time_offset0;
-        v_time_offset1 = a_time_offset1;
+        v_time_offset = a_time_offset;
         v_time = u_time;
       ${this.varyings_
         .map(function (varying) {
@@ -180,8 +180,7 @@ class CustomShaderBuilder extends ShaderBuilder {
       varying float v_width;
       varying vec4 v_prop_hitColor;
       varying float v_distanceOffsetPx;
-      varying float v_time_offset0;
-      varying float v_time_offset1;
+      varying float v_time_offset;
       varying float v_time;
       ${this.varyings_
         .map(function (varying) {
@@ -309,13 +308,32 @@ class CustomShaderBuilder extends ShaderBuilder {
         distance = max(distance, ${this.strokeDistanceFieldExpression_});
         gl_FragColor = color * smoothstep(0.5, -0.5, distance);
 
-        gl_FragColor.a =  v_time_offset0 <  mod(u_time * 1000., 2000.) ? 1. : 0.;
+        if (${this.strokePathDuration_} == 0.){
+          gl_FragColor.a = 1.;
+        } else {
+          gl_FragColor.a = ( 
+            (v_time_offset <  mod((u_time - ${this.strokePathStartTime_}) * 1000., ${this.strokePathDuration_})) && 
+            (v_time_offset >  mod((u_time - ${this.strokePathStartTime_} - 0.5) * 1000., ${this.strokePathDuration_}))
+          ) ? 1. : 0.;
+        }
+
+  
         
         if (u_hitDetection > 0) {
           if (gl_FragColor.a < 0.1) { discard; };
           gl_FragColor = v_prop_hitColor;
         }
       }`;
+  }
+
+  setStrokePathStartTime(expression) {
+    this.strokePathStartTime_ = expression;
+    return this;
+  }
+
+  setStrokPathDuration(expression) {
+    this.strokePathDuration_ = expression;
+    return this;
   }
 }
 
@@ -443,8 +461,7 @@ const Attributes = {
   PARAMETERS: "a_parameters",
   JOIN_ANGLES: "a_joinAngles",
   DISTANCE: "a_distance",
-  TIME_OFFSET0: "a_time_offset0",
-  TIME_OFFSET1: "a_time_offset1",
+  TIME_OFFSET: "a_time_offset",
 };
 
 let workerMessageCounter = 0;
@@ -488,12 +505,7 @@ class CustomStyleRenderer extends VectorStyleRenderer {
         type: AttributeType.FLOAT,
       },
       {
-        name: Attributes.TIME_OFFSET0,
-        size: 1,
-        type: AttributeType.FLOAT,
-      },
-      {
-        name: Attributes.TIME_OFFSET1,
+        name: Attributes.TIME_OFFSET,
         size: 1,
         type: AttributeType.FLOAT,
       },
@@ -645,13 +657,19 @@ class CustomLayerRenderer extends WebGLVectorLayerRenderer {
 
 class CustomLayer extends VectorLayer {
   createRenderer() {
-    return new CustomLayerRenderer(this, {
+    const renerer = new CustomLayerRenderer(this, {
       style: {
-        builder: new CustomShaderBuilder().setStrokeWidthExpression("10."),
-        attributes: [],
-        uniforms: [],
+        // todo 下面的数据应从style数据获取，style更新时renerer也要更新
+        builder: new CustomShaderBuilder()
+          .setStrokeWidthExpression("2.")
+          .addUniform("float timeStart")
+          .addUniform("float timeEnd")
+          .setStrokePathStartTime("0.")
+          .setStrokPathDuration("10000."),
       },
     });
+
+    return renerer;
   }
 }
 
@@ -662,8 +680,12 @@ const vectorSource = new Vector({
       geometry: new LineString([
         [0, 0, 0],
         [10000000, 0, 1000],
-        [10000000, 10000000, 2000],
+        [10000000, 10000000, 10000],
       ]),
+      properties: {
+        startTime: 0,
+        endTime: 10000,
+      },
     }),
   ],
 });
